@@ -1,0 +1,15 @@
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+.vs/
+logs/
+data/
+config/
+*.log
+*.json
+!global.json
+!project.json
+!appsettings.json
+!filter_config.json
