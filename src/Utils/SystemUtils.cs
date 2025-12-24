@@ -431,17 +431,29 @@ Admin Rights: {IsRunningAsAdministrator()}
         /// <summary>
         /// Validates that a path is within a base directory to prevent path traversal attacks.
         /// Security measures:
+        /// - Normalizes paths to handle different separator styles
         /// - Uses GetRelativePath for robust detection
         /// - Handles symbolic links and case-sensitivity properly
         /// - Detects attempts to escape the base directory
+        /// - Rejects paths that equal the base directory (e.g., ".")
         /// </summary>
         private static bool ValidatePathWithinBaseDirectory(string fullPath, string fullBaseDir)
         {
             try
             {
-                var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
-                // If the relative path starts with "..", it's attempting to go outside the base directory
-                return !relativePath.StartsWith("..") && !Path.IsPathRooted(relativePath);
+                // Security: Ensure both paths are fully normalized (should already be from callers)
+                var normalizedPath = Path.GetFullPath(fullPath);
+                var normalizedBase = Path.GetFullPath(fullBaseDir);
+                
+                var relativePath = Path.GetRelativePath(normalizedBase, normalizedPath);
+                
+                // Security checks:
+                // - Reject if attempting to go outside base directory ("..")
+                // - Reject if path is rooted (absolute path)
+                // - Reject if path equals base directory (".")
+                return !relativePath.StartsWith("..") && 
+                       !Path.IsPathRooted(relativePath) &&
+                       !relativePath.Equals(".");
             }
             catch
             {
@@ -471,7 +483,7 @@ Admin Rights: {IsRunningAsAdministrator()}
         /// Validates SSID to prevent command injection and ensure proper format.
         /// Security measures:
         /// - Restricts length to prevent buffer overflow (WiFi standard: 1-32 characters)
-        /// - Allows all printable ASCII characters as per WiFi standards
+        /// - Allows all printable ASCII characters including space (WiFi standards allow spaces)
         /// - Relies on shell escaping for injection prevention rather than character restriction
         /// </summary>
         public static bool IsValidSsid(string ssid)
@@ -483,11 +495,12 @@ Admin Rights: {IsRunningAsAdministrator()}
             if (ssid.Length < 1 || ssid.Length > 32)
                 return false;
             
-            // Security: Allow all printable ASCII characters (WiFi standard)
+            // Security: Allow all printable ASCII characters including space (WiFi standard)
+            // SSIDs commonly use spaces (e.g., "Home Network"), so we include them (ASCII 32)
             // Shell escaping will handle any special characters safely
             foreach (char c in ssid)
             {
-                // Ensure character is in printable ASCII range (space to ~)
+                // Ensure character is in printable ASCII range (space to ~: 32-126)
                 if (c < 32 || c > 126)
                     return false;
             }
@@ -622,7 +635,7 @@ Admin Rights: {IsRunningAsAdministrator()}
         /// - Adds quotes around the argument
         /// - Escapes quotes and backslashes within the argument
         /// - Escapes special Windows shell characters that can cause command injection
-        /// - Prevents command injection through special characters like &, |, <, >, ^, %
+        /// - Prevents command injection through special characters like &, |, <, >, ^, %, ;, (, )
         /// </summary>
         public static string EscapeShellArgument(string argument)
         {
@@ -639,7 +652,10 @@ Admin Rights: {IsRunningAsAdministrator()}
                            .Replace("|", "^|")
                            .Replace("<", "^<")
                            .Replace(">", "^>")
-                           .Replace("%", "^%");
+                           .Replace("%", "^%")
+                           .Replace(";", "^;")
+                           .Replace("(", "^(")
+                           .Replace(")", "^)");
             
             // Wrap in quotes
             return $"\"{escaped}\"";
