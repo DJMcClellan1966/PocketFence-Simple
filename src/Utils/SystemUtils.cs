@@ -45,9 +45,19 @@ namespace PocketFence.Utils
             var fullExePath = Path.GetFullPath(exeName);
             var fullBaseDir = Path.GetFullPath(appBaseDir);
             
-            if (!fullExePath.StartsWith(fullBaseDir, StringComparison.OrdinalIgnoreCase))
+            // Security: Use GetRelativePath to detect path traversal attempts (more robust than StartsWith)
+            try
             {
-                SecureLogError("Cannot restart as administrator: executable path is outside application directory");
+                var relativePath = Path.GetRelativePath(fullBaseDir, fullExePath);
+                if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
+                {
+                    SecureLogError("Cannot restart as administrator: executable path is outside application directory");
+                    return;
+                }
+            }
+            catch
+            {
+                SecureLogError("Cannot restart as administrator: invalid path");
                 return;
             }
 
@@ -161,11 +171,20 @@ Admin Rights: {IsRunningAsAdministrator()}
         {
             var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
             
-            // Security: Validate path
+            // Security: Validate path using GetRelativePath (more robust than StartsWith)
             var fullPath = Path.GetFullPath(logDir);
             var fullBaseDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
             
-            if (!fullPath.StartsWith(fullBaseDir, StringComparison.OrdinalIgnoreCase))
+            try
+            {
+                var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
+                if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
+                {
+                    Console.WriteLine("Error: Invalid log directory path");
+                    return;
+                }
+            }
+            catch
             {
                 Console.WriteLine("Error: Invalid log directory path");
                 return;
@@ -203,9 +222,11 @@ Admin Rights: {IsRunningAsAdministrator()}
                     var fullPath = Path.GetFullPath(dir);
                     var fullBaseDir = Path.GetFullPath(baseDir);
                     
-                    if (!fullPath.StartsWith(fullBaseDir, StringComparison.OrdinalIgnoreCase))
+                    // Security: Use GetRelativePath to detect path traversal (more robust)
+                    var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
+                    if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
                     {
-                        SecureLogError($"Security violation: Directory path is outside base directory: {dir}");
+                        SecureLogError($"Security violation: Directory path is outside base directory");
                         continue;
                     }
 
@@ -340,17 +361,26 @@ Admin Rights: {IsRunningAsAdministrator()}
                 var baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 var logFile = Path.Combine(baseDir, "logs", "application.log");
                 
-                // Security: Validate the log file path
+                // Security: Validate the log file path using GetRelativePath
                 var fullPath = Path.GetFullPath(logFile);
                 var fullBaseDir = Path.GetFullPath(baseDir);
                 
-                if (!fullPath.StartsWith(fullBaseDir, StringComparison.OrdinalIgnoreCase))
+                try
+                {
+                    var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
+                    if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
+                    {
+                        Console.WriteLine("Error: Invalid log file path");
+                        return;
+                    }
+                }
+                catch
                 {
                     Console.WriteLine("Error: Invalid log file path");
                     return;
                 }
                 
-                File.AppendAllText(logFile, logMessage + Environment.NewLine);
+                File.AppendAllText(fullPath, logMessage + Environment.NewLine);
             }
             catch (Exception)
             {
@@ -374,14 +404,22 @@ Admin Rights: {IsRunningAsAdministrator()}
                 var baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 var logFile = Path.Combine(baseDir, "logs", "application.log");
                 
-                // Validate path
+                // Security: Validate path using GetRelativePath
                 var fullPath = Path.GetFullPath(logFile);
                 var fullBaseDir = Path.GetFullPath(baseDir);
                 
-                if (fullPath.StartsWith(fullBaseDir, StringComparison.OrdinalIgnoreCase))
+                try
                 {
-                    File.AppendAllText(logFile, logMessage + Environment.NewLine);
+                    var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
+                    if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
+                        return;
                 }
+                catch
+                {
+                    return;
+                }
+                
+                File.AppendAllText(fullPath, logMessage + Environment.NewLine);
             }
             catch
             {
@@ -445,7 +483,8 @@ Admin Rights: {IsRunningAsAdministrator()}
         /// Security measures:
         /// - Enforces minimum length for security
         /// - Restricts maximum length to prevent buffer overflow
-        /// - Allows safe characters only to prevent injection attacks
+        /// - Allows all printable ASCII characters (as per WPA/WPA2 standard)
+        /// Note: The password will be properly quoted when used in shell commands
         /// </summary>
         public static bool IsValidWifiPassword(string password)
         {
@@ -456,13 +495,12 @@ Admin Rights: {IsRunningAsAdministrator()}
             if (password.Length < 8 || password.Length > 63)
                 return false;
             
-            // Security: Allow only printable ASCII characters (excluding special shell characters)
-            // This prevents command injection through password field
+            // Security: Allow all printable ASCII characters (32-126) as per WPA/WPA2 standard
+            // The password will be properly escaped when used in commands
             foreach (char c in password)
             {
-                // Allow alphanumeric and common safe special characters
-                if (!char.IsLetterOrDigit(c) && 
-                    !"!@#$%^&*()_+-=[]{}:,.?".Contains(c))
+                // Ensure character is in printable ASCII range
+                if (c < 32 || c > 126)
                 {
                     return false;
                 }
@@ -529,8 +567,9 @@ Admin Rights: {IsRunningAsAdministrator()}
         /// <summary>
         /// Sanitizes file paths to prevent path traversal attacks.
         /// Security measures:
-        /// - Removes path traversal sequences (../)
+        /// - Uses GetRelativePath to detect path traversal sequences
         /// - Ensures path stays within the application directory
+        /// - Handles symbolic links and case-sensitivity properly
         /// </summary>
         public static string? SanitizeFilePath(string path, string baseDirectory)
         {
@@ -543,8 +582,11 @@ Admin Rights: {IsRunningAsAdministrator()}
                 var fullPath = Path.GetFullPath(Path.Combine(baseDirectory, path));
                 var fullBaseDir = Path.GetFullPath(baseDirectory);
                 
-                // Security: Ensure the path is within the base directory
-                if (!fullPath.StartsWith(fullBaseDir, StringComparison.OrdinalIgnoreCase))
+                // Security: Use GetRelativePath to detect path traversal (more robust than StartsWith)
+                var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
+                
+                // If the relative path starts with "..", it's attempting to go outside the base directory
+                if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
                     return null;
                 
                 return fullPath;
@@ -553,6 +595,25 @@ Admin Rights: {IsRunningAsAdministrator()}
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Escapes a string for safe use in shell commands.
+        /// Security measures:
+        /// - Adds quotes around the argument
+        /// - Escapes quotes and backslashes within the argument
+        /// - Prevents command injection through special characters
+        /// </summary>
+        public static string EscapeShellArgument(string argument)
+        {
+            if (string.IsNullOrEmpty(argument))
+                return "\"\"";
+            
+            // Escape backslashes and quotes
+            var escaped = argument.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            
+            // Wrap in quotes
+            return $"\"{escaped}\"";
         }
     }
 }

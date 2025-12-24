@@ -28,19 +28,22 @@ namespace PocketFence.Services
                 // Security: Validate password to prevent command injection and ensure security
                 if (!SystemUtils.IsValidWifiPassword(password))
                 {
-                    HotspotStatusChanged?.Invoke(this, "Invalid password format. Password must be 8-63 characters with safe characters only.");
+                    HotspotStatusChanged?.Invoke(this, "Invalid password format. Password must be 8-63 characters with printable ASCII characters only.");
                     return false;
                 }
 
                 // Create the hotspot profile
                 var profileXml = CreateHotspotProfile(ssid, password);
                 
+                // Security: Properly escape SSID and password for shell command usage
+                var escapedSsid = SystemUtils.EscapeShellArgument(ssid);
+                var escapedPassword = SystemUtils.EscapeShellArgument(password);
+                
                 // Use netsh command to set up hosted network
-                // Security: SSID and password are now validated, but we still quote them for safety
                 var startInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = "netsh",
-                    Arguments = $"wlan set hostednetwork mode=allow ssid=\"{ssid}\" key=\"{password}\"",
+                    Arguments = $"wlan set hostednetwork mode=allow ssid={escapedSsid} key={escapedPassword}",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
