@@ -21,7 +21,7 @@ namespace PocketFence.Services
                 // Security: Validate SSID to prevent command injection
                 if (!SystemUtils.IsValidSsid(ssid))
                 {
-                    HotspotStatusChanged?.Invoke(this, "Invalid SSID format. Use only alphanumeric characters, spaces, dashes, and underscores (1-32 characters).");
+                    HotspotStatusChanged?.Invoke(this, "Invalid SSID format. SSID must be 1-32 printable ASCII characters.");
                     return false;
                 }
 

@@ -65,6 +65,8 @@ namespace PocketFence.Utils
             }
 
             // Security: Verify the file is an executable
+            // Note: We only allow .exe files for security. The application should be compiled as .exe
+            // Other executable extensions (.com, .bat, .cmd, .scr) are not expected for .NET applications
             if (!fullExePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
                 SecureLogError("Cannot restart as administrator: file is not an executable");
@@ -468,9 +470,9 @@ Admin Rights: {IsRunningAsAdministrator()}
         /// <summary>
         /// Validates SSID to prevent command injection and ensure proper format.
         /// Security measures:
-        /// - Restricts length to prevent buffer overflow
-        /// - Allows only safe characters (alphanumeric, dash, underscore)
-        /// - Prevents special characters that could be used for injection
+        /// - Restricts length to prevent buffer overflow (WiFi standard: 1-32 characters)
+        /// - Allows all printable ASCII characters as per WiFi standards
+        /// - Relies on shell escaping for injection prevention rather than character restriction
         /// </summary>
         public static bool IsValidSsid(string ssid)
         {
@@ -481,8 +483,16 @@ Admin Rights: {IsRunningAsAdministrator()}
             if (ssid.Length < 1 || ssid.Length > 32)
                 return false;
             
-            // Security: Allow only alphanumeric, space, dash, and underscore to prevent injection
-            return ssid.All(c => char.IsLetterOrDigit(c) || c == ' ' || c == '-' || c == '_');
+            // Security: Allow all printable ASCII characters (WiFi standard)
+            // Shell escaping will handle any special characters safely
+            foreach (char c in ssid)
+            {
+                // Ensure character is in printable ASCII range (space to ~)
+                if (c < 32 || c > 126)
+                    return false;
+            }
+            
+            return true;
         }
 
         /// <summary>
@@ -623,12 +633,12 @@ Admin Rights: {IsRunningAsAdministrator()}
             var escaped = argument.Replace("\\", "\\\\").Replace("\"", "\\\"");
             
             // Security: Escape Windows shell special characters
-            // These characters have special meaning in cmd.exe and can be used for injection
-            escaped = escaped.Replace("&", "^&")
+            // IMPORTANT: Escape '^' FIRST, otherwise it will double-escape other characters
+            escaped = escaped.Replace("^", "^^")
+                           .Replace("&", "^&")
                            .Replace("|", "^|")
                            .Replace("<", "^<")
                            .Replace(">", "^>")
-                           .Replace("^", "^^")
                            .Replace("%", "^%");
             
             // Wrap in quotes
