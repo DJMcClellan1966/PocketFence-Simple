@@ -7,6 +7,9 @@ namespace PocketFence.Utils
 {
     public static class SystemUtils
     {
+        // Security: Lock object for thread-safe file logging
+        private static readonly object _logLock = new object();
+
         public static bool IsRunningAsAdministrator()
         {
             var identity = WindowsIdentity.GetCurrent();
@@ -171,20 +174,11 @@ Admin Rights: {IsRunningAsAdministrator()}
         {
             var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
             
-            // Security: Validate path using GetRelativePath (more robust than StartsWith)
+            // Security: Validate path using helper method
             var fullPath = Path.GetFullPath(logDir);
             var fullBaseDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
             
-            try
-            {
-                var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
-                if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
-                {
-                    Console.WriteLine("Error: Invalid log directory path");
-                    return;
-                }
-            }
-            catch
+            if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
             {
                 Console.WriteLine("Error: Invalid log directory path");
                 return;
@@ -222,9 +216,8 @@ Admin Rights: {IsRunningAsAdministrator()}
                     var fullPath = Path.GetFullPath(dir);
                     var fullBaseDir = Path.GetFullPath(baseDir);
                     
-                    // Security: Use GetRelativePath to detect path traversal (more robust)
-                    var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
-                    if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
+                    // Security: Use shared helper method for validation
+                    if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
                     {
                         SecureLogError($"Security violation: Directory path is outside base directory");
                         continue;
@@ -346,6 +339,7 @@ Admin Rights: {IsRunningAsAdministrator()}
         /// - Sanitizes log messages to prevent log injection
         /// - Does not log sensitive data like passwords, tokens, or personal information
         /// - Validates file path before writing
+        /// - Thread-safe file writing using lock
         /// </summary>
         public static void LogEvent(string message, string level = "INFO")
         {
@@ -361,26 +355,21 @@ Admin Rights: {IsRunningAsAdministrator()}
                 var baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 var logFile = Path.Combine(baseDir, "logs", "application.log");
                 
-                // Security: Validate the log file path using GetRelativePath
+                // Security: Validate the log file path
                 var fullPath = Path.GetFullPath(logFile);
                 var fullBaseDir = Path.GetFullPath(baseDir);
                 
-                try
-                {
-                    var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
-                    if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
-                    {
-                        Console.WriteLine("Error: Invalid log file path");
-                        return;
-                    }
-                }
-                catch
+                if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
                 {
                     Console.WriteLine("Error: Invalid log file path");
                     return;
                 }
                 
-                File.AppendAllText(fullPath, logMessage + Environment.NewLine);
+                // Security: Use lock for thread-safe file writing
+                lock (_logLock)
+                {
+                    File.AppendAllText(fullPath, logMessage + Environment.NewLine);
+                }
             }
             catch (Exception)
             {
@@ -392,6 +381,7 @@ Admin Rights: {IsRunningAsAdministrator()}
         /// <summary>
         /// Securely logs errors without exposing sensitive information like stack traces to end users.
         /// Logs are written to file only, not to console.
+        /// Thread-safe file writing using lock.
         /// </summary>
         private static void SecureLogError(string message)
         {
@@ -404,22 +394,18 @@ Admin Rights: {IsRunningAsAdministrator()}
                 var baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 var logFile = Path.Combine(baseDir, "logs", "application.log");
                 
-                // Security: Validate path using GetRelativePath
+                // Security: Validate path
                 var fullPath = Path.GetFullPath(logFile);
                 var fullBaseDir = Path.GetFullPath(baseDir);
                 
-                try
-                {
-                    var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
-                    if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
-                        return;
-                }
-                catch
-                {
+                if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
                     return;
-                }
                 
-                File.AppendAllText(fullPath, logMessage + Environment.NewLine);
+                // Security: Use lock for thread-safe file writing
+                lock (_logLock)
+                {
+                    File.AppendAllText(fullPath, logMessage + Environment.NewLine);
+                }
             }
             catch
             {
@@ -438,6 +424,27 @@ Admin Rights: {IsRunningAsAdministrator()}
             
             // Security: Remove newlines and carriage returns to prevent log injection
             return message.Replace("\r", "").Replace("\n", " ").Trim();
+        }
+
+        /// <summary>
+        /// Validates that a path is within a base directory to prevent path traversal attacks.
+        /// Security measures:
+        /// - Uses GetRelativePath for robust detection
+        /// - Handles symbolic links and case-sensitivity properly
+        /// - Detects attempts to escape the base directory
+        /// </summary>
+        private static bool ValidatePathWithinBaseDirectory(string fullPath, string fullBaseDir)
+        {
+            try
+            {
+                var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
+                // If the relative path starts with "..", it's attempting to go outside the base directory
+                return !relativePath.StartsWith("..") && !Path.IsPathRooted(relativePath);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static bool IsValidIpAddress(string ipAddress)
@@ -567,6 +574,7 @@ Admin Rights: {IsRunningAsAdministrator()}
         /// <summary>
         /// Sanitizes file paths to prevent path traversal attacks.
         /// Security measures:
+        /// - Validates input path before combining with base directory
         /// - Uses GetRelativePath to detect path traversal sequences
         /// - Ensures path stays within the application directory
         /// - Handles symbolic links and case-sensitivity properly
@@ -578,15 +586,16 @@ Admin Rights: {IsRunningAsAdministrator()}
             
             try
             {
+                // Security: Reject paths that are already absolute or contain drive letters
+                if (Path.IsPathRooted(path))
+                    return null;
+                
                 // Get full paths to check for traversal
                 var fullPath = Path.GetFullPath(Path.Combine(baseDirectory, path));
                 var fullBaseDir = Path.GetFullPath(baseDirectory);
                 
-                // Security: Use GetRelativePath to detect path traversal (more robust than StartsWith)
-                var relativePath = Path.GetRelativePath(fullBaseDir, fullPath);
-                
-                // If the relative path starts with "..", it's attempting to go outside the base directory
-                if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
+                // Security: Use shared helper method for validation
+                if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
                     return null;
                 
                 return fullPath;
@@ -598,19 +607,29 @@ Admin Rights: {IsRunningAsAdministrator()}
         }
 
         /// <summary>
-        /// Escapes a string for safe use in shell commands.
+        /// Escapes a string for safe use in Windows shell commands.
         /// Security measures:
         /// - Adds quotes around the argument
         /// - Escapes quotes and backslashes within the argument
-        /// - Prevents command injection through special characters
+        /// - Escapes special Windows shell characters that can cause command injection
+        /// - Prevents command injection through special characters like &, |, <, >, ^, %
         /// </summary>
         public static string EscapeShellArgument(string argument)
         {
             if (string.IsNullOrEmpty(argument))
                 return "\"\"";
             
-            // Escape backslashes and quotes
+            // Security: Escape backslashes and quotes first
             var escaped = argument.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            
+            // Security: Escape Windows shell special characters
+            // These characters have special meaning in cmd.exe and can be used for injection
+            escaped = escaped.Replace("&", "^&")
+                           .Replace("|", "^|")
+                           .Replace("<", "^<")
+                           .Replace(">", "^>")
+                           .Replace("^", "^^")
+                           .Replace("%", "^%");
             
             // Wrap in quotes
             return $"\"{escaped}\"";

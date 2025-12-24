@@ -219,11 +219,14 @@ namespace PocketFence.Services
                     return "Unknown";
                 }
 
+                // Security: Escape IP address for shell command even though it's validated
+                var escapedIp = SystemUtils.EscapeShellArgument(ipAddress);
+
                 // Use ARP table to get MAC address
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "arp",
-                    Arguments = $"-a {ipAddress}",
+                    Arguments = $"-a {escapedIp}",
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
