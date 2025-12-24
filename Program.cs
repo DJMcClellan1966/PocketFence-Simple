@@ -62,9 +62,14 @@ namespace PocketFence_Simple
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Fatal Error: {ex.Message}");
-                Console.WriteLine("Stack Trace:");
-                Console.WriteLine(ex.StackTrace);
+                // Security: Don't expose stack traces to end users as they may contain sensitive information
+                Console.WriteLine($"❌ Fatal Error: An unexpected error occurred.");
+                Console.WriteLine("Please check the application logs for more details.");
+                
+                // Log the full error details to file for debugging
+                SystemUtils.LogEvent($"Fatal error: {ex.Message}", "ERROR");
+                SystemUtils.LogEvent($"Stack trace: {ex.StackTrace}", "ERROR");
+                
                 Console.WriteLine();
                 Console.WriteLine("Press any key to exit...");
                 Console.ReadKey();

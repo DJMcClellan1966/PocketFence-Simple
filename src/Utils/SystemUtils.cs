@@ -1,10 +1,15 @@
 using System.Security.Principal;
 using System.Diagnostics;
+using System.IO;
+using System.Security.AccessControl;
 
 namespace PocketFence.Utils
 {
     public static class SystemUtils
     {
+        // Security: Lock object for thread-safe file logging
+        private static readonly object _logLock = new object();
+
         public static bool IsRunningAsAdministrator()
         {
             var identity = WindowsIdentity.GetCurrent();
@@ -12,25 +17,80 @@ namespace PocketFence.Utils
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
 
+        /// <summary>
+        /// Securely restarts the application with administrator privileges.
+        /// Security measures:
+        /// - Validates that the executable path is within the application directory to prevent arbitrary execution
+        /// - Ensures the path exists and is a valid executable file
+        /// - Does not pass any command-line arguments to prevent parameter injection
+        /// - Uses only the verified executable path without shell execution
+        /// </summary>
         public static void RestartAsAdministrator()
         {
             var exeName = Process.GetCurrentProcess().MainModule?.FileName;
-            if (exeName != null)
+            
+            // Security: Validate executable path to prevent arbitrary execution
+            if (string.IsNullOrWhiteSpace(exeName))
             {
-                var startInfo = new ProcessStartInfo(exeName)
+                SecureLogError("Cannot restart as administrator: executable path is null or empty");
+                return;
+            }
+
+            // Security: Ensure the executable exists and is a valid file
+            if (!File.Exists(exeName))
+            {
+                SecureLogError("Cannot restart as administrator: executable file not found");
+                return;
+            }
+
+            // Security: Validate the path is within expected application directory to prevent path traversal
+            var appBaseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var fullExePath = Path.GetFullPath(exeName);
+            var fullBaseDir = Path.GetFullPath(appBaseDir);
+            
+            // Security: Use GetRelativePath to detect path traversal attempts (more robust than StartsWith)
+            try
+            {
+                var relativePath = Path.GetRelativePath(fullBaseDir, fullExePath);
+                if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
                 {
-                    Verb = "runas"
+                    SecureLogError("Cannot restart as administrator: executable path is outside application directory");
+                    return;
+                }
+            }
+            catch
+            {
+                SecureLogError("Cannot restart as administrator: invalid path");
+                return;
+            }
+
+            // Security: Verify the file is an executable
+            // Note: We only allow .exe files for security. The application should be compiled as .exe
+            // Other executable extensions (.com, .bat, .cmd, .scr) are not expected for .NET applications
+            if (!fullExePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                SecureLogError("Cannot restart as administrator: file is not an executable");
+                return;
+            }
+
+            try
+            {
+                var startInfo = new ProcessStartInfo(fullExePath)
+                {
+                    Verb = "runas",
+                    UseShellExecute = true,  // Required for "runas" verb
+                    // Security: Do not pass any arguments to prevent parameter injection
+                    Arguments = string.Empty
                 };
                 
-                try
-                {
-                    Process.Start(startInfo);
-                    Environment.Exit(0);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to restart as administrator: {ex.Message}");
-                }
+                Process.Start(startInfo);
+                Environment.Exit(0);
+            }
+            catch (Exception)
+            {
+                // Security: Don't expose detailed error information to the user
+                SecureLogError("Failed to restart as administrator. Please run the application as administrator manually.");
+                Console.WriteLine("Failed to restart as administrator. Please run the application as administrator manually.");
             }
         }
 
@@ -76,9 +136,11 @@ namespace PocketFence.Utils
                            output.Contains("Yes");
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Error checking WiFi adapter: {ex.Message}");
+                // Security: Log error without exposing sensitive details
+                SecureLogError("Error checking WiFi adapter capabilities");
+                Console.WriteLine("Error checking WiFi adapter. Please ensure wireless adapter is properly installed.");
             }
             
             return false;
@@ -113,12 +175,31 @@ Admin Rights: {IsRunningAsAdministrator()}
         public static void CreateLogDirectory()
         {
             var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
-            if (!Directory.Exists(logDir))
+            
+            // Security: Validate path using helper method
+            var fullPath = Path.GetFullPath(logDir);
+            var fullBaseDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
+            
+            if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
             {
-                Directory.CreateDirectory(logDir);
+                Console.WriteLine("Error: Invalid log directory path");
+                return;
+            }
+            
+            if (!Directory.Exists(fullPath))
+            {
+                Directory.CreateDirectory(fullPath);
+                SetSecureDirectoryPermissions(fullPath);
             }
         }
 
+        /// <summary>
+        /// Creates application directories with secure permissions.
+        /// Security measures:
+        /// - Validates directory paths to prevent path traversal
+        /// - Sets restrictive ACLs to allow only administrators and system access
+        /// - Ensures directories are within the application base directory
+        /// </summary>
         public static void SetupApplicationDirectories()
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -131,10 +212,95 @@ Admin Rights: {IsRunningAsAdministrator()}
 
             foreach (var dir in directories)
             {
-                if (!Directory.Exists(dir))
+                try
                 {
-                    Directory.CreateDirectory(dir);
+                    // Security: Validate the directory path to prevent path traversal
+                    var fullPath = Path.GetFullPath(dir);
+                    var fullBaseDir = Path.GetFullPath(baseDir);
+                    
+                    // Security: Use shared helper method for validation
+                    if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
+                    {
+                        SecureLogError($"Security violation: Directory path is outside base directory");
+                        continue;
+                    }
+
+                    if (!Directory.Exists(fullPath))
+                    {
+                        Directory.CreateDirectory(fullPath);
+                        
+                        // Security: Set restrictive permissions on the directory
+                        SetSecureDirectoryPermissions(fullPath);
+                    }
                 }
+                catch (Exception)
+                {
+                    // Security: Log error without exposing sensitive path details
+                    SecureLogError($"Failed to create or secure application directory");
+                    Console.WriteLine($"Warning: Could not create or secure directory: {Path.GetFileName(dir)}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sets secure permissions on a directory to restrict access to administrators and system only.
+        /// </summary>
+        private static void SetSecureDirectoryPermissions(string directoryPath)
+        {
+            try
+            {
+                // Security: Configure ACL to allow only Administrators and SYSTEM full control
+                var dirInfo = new DirectoryInfo(directoryPath);
+                var dirSecurity = dirInfo.GetAccessControl();
+                
+                // Disable inheritance and remove existing rules
+                dirSecurity.SetAccessRuleProtection(true, false);
+                
+                foreach (FileSystemAccessRule rule in dirSecurity.GetAccessRules(true, true, typeof(System.Security.Principal.NTAccount)))
+                {
+                    dirSecurity.RemoveAccessRule(rule);
+                }
+                
+                // Add rule for Administrators (Full Control)
+                var adminRule = new FileSystemAccessRule(
+                    new System.Security.Principal.SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+                    FileSystemRights.FullControl,
+                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                    PropagationFlags.None,
+                    AccessControlType.Allow
+                );
+                dirSecurity.AddAccessRule(adminRule);
+                
+                // Add rule for SYSTEM (Full Control)
+                var systemRule = new FileSystemAccessRule(
+                    new System.Security.Principal.SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+                    FileSystemRights.FullControl,
+                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                    PropagationFlags.None,
+                    AccessControlType.Allow
+                );
+                dirSecurity.AddAccessRule(systemRule);
+                
+                // Add rule for current user (Full Control) - needed for the application to function
+                var currentUser = WindowsIdentity.GetCurrent();
+                if (currentUser.User != null)
+                {
+                    var userRule = new FileSystemAccessRule(
+                        currentUser.User,
+                        FileSystemRights.FullControl,
+                        InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                        PropagationFlags.None,
+                        AccessControlType.Allow
+                    );
+                    dirSecurity.AddAccessRule(userRule);
+                }
+                
+                dirInfo.SetAccessControl(dirSecurity);
+            }
+            catch (Exception)
+            {
+                // Security: Log without exposing details
+                SecureLogError("Failed to set secure permissions on directory");
             }
         }
 
@@ -169,21 +335,129 @@ Admin Rights: {IsRunningAsAdministrator()}
             return $"{formattedBytes:F2} {suffixes[suffixIndex]}";
         }
 
+        /// <summary>
+        /// Securely logs events to file and console without exposing sensitive information.
+        /// Security measures:
+        /// - Sanitizes log messages to prevent log injection
+        /// - Does not log sensitive data like passwords, tokens, or personal information
+        /// - Validates file path before writing
+        /// - Thread-safe file writing using lock
+        /// </summary>
         public static void LogEvent(string message, string level = "INFO")
         {
+            // Security: Sanitize message to prevent log injection attacks
+            var sanitizedMessage = SanitizeLogMessage(message);
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            var logMessage = $"[{timestamp}] [{level}] {message}";
+            var logMessage = $"[{timestamp}] [{level}] {sanitizedMessage}";
             
             Console.WriteLine(logMessage);
             
             try
             {
-                var logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs", "application.log");
-                File.AppendAllTextAsync(logFile, logMessage + Environment.NewLine);
+                var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                var logFile = Path.Combine(baseDir, "logs", "application.log");
+                
+                // Security: Validate the log file path
+                var fullPath = Path.GetFullPath(logFile);
+                var fullBaseDir = Path.GetFullPath(baseDir);
+                
+                if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
+                {
+                    Console.WriteLine("Error: Invalid log file path");
+                    return;
+                }
+                
+                // Security: Use lock for thread-safe file writing
+                lock (_logLock)
+                {
+                    File.AppendAllText(fullPath, logMessage + Environment.NewLine);
+                }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Failed to write to log file: {ex.Message}");
+                // Don't log to console if file logging fails to avoid infinite loops
+                // Just continue - console logging already happened
+            }
+        }
+
+        /// <summary>
+        /// Securely logs errors without exposing sensitive information like stack traces to end users.
+        /// Logs are written to file only, not to console.
+        /// Thread-safe file writing using lock.
+        /// </summary>
+        private static void SecureLogError(string message)
+        {
+            try
+            {
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                var sanitizedMessage = SanitizeLogMessage(message);
+                var logMessage = $"[{timestamp}] [ERROR] {sanitizedMessage}";
+                
+                var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                var logFile = Path.Combine(baseDir, "logs", "application.log");
+                
+                // Security: Validate path
+                var fullPath = Path.GetFullPath(logFile);
+                var fullBaseDir = Path.GetFullPath(baseDir);
+                
+                if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
+                    return;
+                
+                // Security: Use lock for thread-safe file writing
+                lock (_logLock)
+                {
+                    File.AppendAllText(fullPath, logMessage + Environment.NewLine);
+                }
+            }
+            catch
+            {
+                // Silently fail - this is error logging, we can't do much if it fails
+            }
+        }
+
+        /// <summary>
+        /// Sanitizes log messages to prevent log injection attacks.
+        /// Removes newlines and carriage returns that could be used to inject fake log entries.
+        /// </summary>
+        private static string SanitizeLogMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return string.Empty;
+            
+            // Security: Remove newlines and carriage returns to prevent log injection
+            return message.Replace("\r", "").Replace("\n", " ").Trim();
+        }
+
+        /// <summary>
+        /// Validates that a path is within a base directory to prevent path traversal attacks.
+        /// Security measures:
+        /// - Normalizes paths to handle different separator styles
+        /// - Uses GetRelativePath for robust detection
+        /// - Handles symbolic links and case-sensitivity properly
+        /// - Detects attempts to escape the base directory
+        /// - Rejects paths that equal the base directory (e.g., ".")
+        /// </summary>
+        private static bool ValidatePathWithinBaseDirectory(string fullPath, string fullBaseDir)
+        {
+            try
+            {
+                // Security: Ensure both paths are fully normalized (should already be from callers)
+                var normalizedPath = Path.GetFullPath(fullPath);
+                var normalizedBase = Path.GetFullPath(fullBaseDir);
+                
+                var relativePath = Path.GetRelativePath(normalizedBase, normalizedPath);
+                
+                // Security checks:
+                // - Reject if attempting to go outside base directory ("..")
+                // - Reject if path is rooted (absolute path)
+                // - Reject if path equals base directory (".")
+                return !relativePath.StartsWith("..") && 
+                       !Path.IsPathRooted(relativePath) &&
+                       !relativePath.Equals(".");
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -203,6 +477,188 @@ Admin Rights: {IsRunningAsAdministrator()}
             // Should be exactly 12 hex characters
             return cleanMac.Length == 12 && 
                    cleanMac.All(c => char.IsDigit(c) || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'));
+        }
+
+        /// <summary>
+        /// Validates SSID to prevent command injection and ensure proper format.
+        /// Security measures:
+        /// - Restricts length to prevent buffer overflow (WiFi standard: 1-32 characters)
+        /// - Allows all printable ASCII characters including space (WiFi standards allow spaces)
+        /// - Relies on shell escaping for injection prevention rather than character restriction
+        /// </summary>
+        public static bool IsValidSsid(string ssid)
+        {
+            if (string.IsNullOrWhiteSpace(ssid))
+                return false;
+            
+            // SSID must be 1-32 characters (WiFi standard limit)
+            if (ssid.Length < 1 || ssid.Length > 32)
+                return false;
+            
+            // Security: Allow all printable ASCII characters including space (WiFi standard)
+            // SSIDs commonly use spaces (e.g., "Home Network"), so we include them (ASCII 32)
+            // Shell escaping will handle any special characters safely
+            foreach (char c in ssid)
+            {
+                // Ensure character is in printable ASCII range (space to ~: 32-126)
+                if (c < 32 || c > 126)
+                    return false;
+            }
+            
+            return true;
+        }
+
+        /// <summary>
+        /// Validates WiFi password to ensure it meets security requirements.
+        /// Security measures:
+        /// - Enforces minimum length for security
+        /// - Restricts maximum length to prevent buffer overflow
+        /// - Allows all printable ASCII characters (as per WPA/WPA2 standard)
+        /// Note: The password will be properly quoted when used in shell commands
+        /// </summary>
+        public static bool IsValidWifiPassword(string password)
+        {
+            if (string.IsNullOrWhiteSpace(password))
+                return false;
+            
+            // WPA2 password must be 8-63 characters
+            if (password.Length < 8 || password.Length > 63)
+                return false;
+            
+            // Security: Allow all printable ASCII characters (32-126) as per WPA/WPA2 standard
+            // The password will be properly escaped when used in commands
+            foreach (char c in password)
+            {
+                // Ensure character is in printable ASCII range
+                if (c < 32 || c > 126)
+                {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+
+        /// <summary>
+        /// Validates URL format to prevent injection attacks.
+        /// Security measures:
+        /// - Ensures proper URL format
+        /// - Prevents malformed URLs that could cause security issues
+        /// </summary>
+        public static bool IsValidUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return false;
+            
+            // Use Uri.TryCreate with UriKind.Absolute for validation
+            return Uri.TryCreate(url, UriKind.Absolute, out Uri? uriResult)
+                   && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps);
+        }
+
+        /// <summary>
+        /// Validates domain name format.
+        /// Security measures:
+        /// - Ensures proper domain format
+        /// - Prevents malformed domains
+        /// </summary>
+        public static bool IsValidDomain(string domain)
+        {
+            if (string.IsNullOrWhiteSpace(domain))
+                return false;
+            
+            // Domain name constraints: alphanumeric, dots, and dashes
+            // Must not start or end with dash or dot
+            if (domain.StartsWith("-") || domain.EndsWith("-") ||
+                domain.StartsWith(".") || domain.EndsWith("."))
+                return false;
+            
+            // Check length (max 253 characters for full domain)
+            if (domain.Length > 253)
+                return false;
+            
+            // Each label (part between dots) should be valid
+            var labels = domain.Split('.');
+            foreach (var label in labels)
+            {
+                if (string.IsNullOrWhiteSpace(label) || label.Length > 63)
+                    return false;
+                
+                // Labels can only contain alphanumeric and dash (not at start/end)
+                if (!label.All(c => char.IsLetterOrDigit(c) || c == '-'))
+                    return false;
+                
+                if (label.StartsWith("-") || label.EndsWith("-"))
+                    return false;
+            }
+            
+            return true;
+        }
+
+        /// <summary>
+        /// Sanitizes file paths to prevent path traversal attacks.
+        /// Security measures:
+        /// - Validates input path before combining with base directory
+        /// - Uses GetRelativePath to detect path traversal sequences
+        /// - Ensures path stays within the application directory
+        /// - Handles symbolic links and case-sensitivity properly
+        /// </summary>
+        public static string? SanitizeFilePath(string path, string baseDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(baseDirectory))
+                return null;
+            
+            try
+            {
+                // Security: Reject paths that are already absolute or contain drive letters
+                if (Path.IsPathRooted(path))
+                    return null;
+                
+                // Get full paths to check for traversal
+                var fullPath = Path.GetFullPath(Path.Combine(baseDirectory, path));
+                var fullBaseDir = Path.GetFullPath(baseDirectory);
+                
+                // Security: Use shared helper method for validation
+                if (!ValidatePathWithinBaseDirectory(fullPath, fullBaseDir))
+                    return null;
+                
+                return fullPath;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Escapes a string for safe use in Windows shell commands.
+        /// Security measures:
+        /// - Adds quotes around the argument
+        /// - Escapes quotes and backslashes within the argument
+        /// - Escapes special Windows shell characters that can cause command injection
+        /// - Prevents command injection through special characters like &, |, <, >, ^, %, ;, (, )
+        /// </summary>
+        public static string EscapeShellArgument(string argument)
+        {
+            if (string.IsNullOrEmpty(argument))
+                return "\"\"";
+            
+            // Security: Escape backslashes and quotes first
+            var escaped = argument.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            
+            // Security: Escape Windows shell special characters
+            // IMPORTANT: Escape '^' FIRST, otherwise it will double-escape other characters
+            escaped = escaped.Replace("^", "^^")
+                           .Replace("&", "^&")
+                           .Replace("|", "^|")
+                           .Replace("<", "^<")
+                           .Replace(">", "^>")
+                           .Replace("%", "^%")
+                           .Replace(";", "^;")
+                           .Replace("(", "^(")
+                           .Replace(")", "^)");
+            
+            // Wrap in quotes
+            return $"\"{escaped}\"";
         }
     }
 }

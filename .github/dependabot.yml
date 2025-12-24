@@ -1,0 +1,47 @@
+# GitHub Dependabot configuration for automatic security alerts and dependency updates
+# This file enables automated security vulnerability detection and dependency version updates
+
+version: 2
+updates:
+  # Enable version updates for NuGet packages
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    # Automatically create pull requests for security updates
+    open-pull-requests-limit: 10
+    # Group minor and patch updates together
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Security updates are always created immediately, regardless of schedule
+    labels:
+      - "dependencies"
+      - "security"
+    reviewers:
+      - "DJMcClellan1966"
+    # Commit message configuration
+    commit-message:
+      prefix: "security"
+      prefix-development: "chore"
+      include: "scope"
+
+  # Enable security updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    reviewers:
+      - "DJMcClellan1966"
