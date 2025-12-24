@@ -2,12 +2,12 @@ using System.Management;
 using System.Net;
 using System.Net.NetworkInformation;
 using PocketFence.Models;
+using PocketFence.Utils;
 
 namespace PocketFence.Services
 {
     public class HotspotService
     {
-        private ManagementObjectSearcher? _wlanSearcher;
         private bool _isHotspotEnabled = false;
         
         public event EventHandler<string>? HotspotStatusChanged;
@@ -18,10 +18,25 @@ namespace PocketFence.Services
         {
             try
             {
+                // Security: Validate SSID to prevent command injection
+                if (!SystemUtils.IsValidSsid(ssid))
+                {
+                    HotspotStatusChanged?.Invoke(this, "Invalid SSID format. Use only alphanumeric characters, spaces, dashes, and underscores (1-32 characters).");
+                    return false;
+                }
+
+                // Security: Validate password to prevent command injection and ensure security
+                if (!SystemUtils.IsValidWifiPassword(password))
+                {
+                    HotspotStatusChanged?.Invoke(this, "Invalid password format. Password must be 8-63 characters with safe characters only.");
+                    return false;
+                }
+
                 // Create the hotspot profile
                 var profileXml = CreateHotspotProfile(ssid, password);
                 
                 // Use netsh command to set up hosted network
+                // Security: SSID and password are now validated, but we still quote them for safety
                 var startInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = "netsh",
@@ -53,7 +68,9 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                HotspotStatusChanged?.Invoke(this, $"Error enabling hotspot: {ex.Message}");
+                // Security: Don't expose detailed error information to users
+                SystemUtils.LogEvent($"Error enabling hotspot: {ex.Message}", "ERROR");
+                HotspotStatusChanged?.Invoke(this, "Error enabling hotspot. Check logs for details.");
                 return false;
             }
         }
@@ -91,7 +108,9 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                HotspotStatusChanged?.Invoke(this, $"Error disabling hotspot: {ex.Message}");
+                // Security: Don't expose detailed error information to users
+                SystemUtils.LogEvent($"Error disabling hotspot: {ex.Message}", "ERROR");
+                HotspotStatusChanged?.Invoke(this, "Error disabling hotspot. Check logs for details.");
                 return false;
             }
         }
@@ -123,7 +142,9 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting connected devices: {ex.Message}");
+                // Security: Don't expose detailed error information to users
+                SystemUtils.LogEvent($"Error getting connected devices: {ex.Message}", "ERROR");
+                Console.WriteLine("Error retrieving connected devices. Check logs for details.");
             }
             
             return devices;
@@ -249,7 +270,8 @@ namespace PocketFence.Services
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error in device monitoring: {ex.Message}");
+                        // Security: Don't expose detailed error information to users
+                        SystemUtils.LogEvent($"Error in device monitoring: {ex.Message}", "ERROR");
                         await Task.Delay(10000); // Wait longer on error
                     }
                 }

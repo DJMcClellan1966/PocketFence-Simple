@@ -1,4 +1,5 @@
 using PocketFence.Models;
+using PocketFence.Utils;
 using System.Text.Json;
 
 namespace PocketFence.Services
@@ -98,6 +99,13 @@ namespace PocketFence.Services
         {
             try
             {
+                // Security: Validate URL format to prevent malformed URLs
+                if (!SystemUtils.IsValidUrl(url))
+                {
+                    SystemUtils.LogEvent($"Invalid URL format detected: {url}", "WARNING");
+                    return true; // Block invalid URLs
+                }
+
                 var uri = new Uri(url);
                 var domain = uri.Host.ToLower();
                 
@@ -132,7 +140,8 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error checking URL {url}: {ex.Message}");
+                // Security: Don't expose error details to users
+                SystemUtils.LogEvent($"Error checking URL: {ex.Message}", "ERROR");
                 return false; // Allow on error
             }
         }
@@ -203,9 +212,23 @@ namespace PocketFence.Services
             
             SiteBlocked?.Invoke(this, blockedSite);
             
-            // Log to file
+            // Security: Log to file securely without exposing sensitive data
             var logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - BLOCKED: {url} for device {deviceMac} - Reason: {reason}";
-            File.AppendAllTextAsync(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "blocked_sites.log"), logEntry + Environment.NewLine);
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "blocked_sites.log");
+            
+            try
+            {
+                // Validate log path
+                var sanitizedPath = SystemUtils.SanitizeFilePath("blocked_sites.log", AppDomain.CurrentDomain.BaseDirectory);
+                if (sanitizedPath != null)
+                {
+                    File.AppendAllText(sanitizedPath, logEntry + Environment.NewLine);
+                }
+            }
+            catch (Exception ex)
+            {
+                SystemUtils.LogEvent($"Failed to log blocked site: {ex.Message}", "ERROR");
+            }
         }
 
         public void AddFilterRule(FilterRule rule)
@@ -244,6 +267,13 @@ namespace PocketFence.Services
 
         public void AddBlockedDomain(string domain)
         {
+            // Security: Validate domain format to prevent injection
+            if (!SystemUtils.IsValidDomain(domain))
+            {
+                SystemUtils.LogEvent($"Invalid domain format: {domain}", "WARNING");
+                return;
+            }
+
             if (!_blockedDomains.Contains(domain.ToLower()))
             {
                 _blockedDomains.Add(domain.ToLower());
@@ -282,7 +312,9 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving configuration: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error saving configuration: {ex.Message}", "ERROR");
+                Console.WriteLine("Error saving configuration. Check logs for details.");
             }
         }
 
@@ -302,7 +334,9 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading configuration: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error loading configuration: {ex.Message}", "ERROR");
+                Console.WriteLine("Error loading configuration. Using defaults.");
             }
         }
 

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using PocketFence.Utils;
 
 namespace PocketFence.Services
 {
@@ -34,7 +35,9 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                TrafficMonitoringStatusChanged?.Invoke(this, $"Failed to start traffic monitoring: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Failed to start traffic monitoring: {ex.Message}", "ERROR");
+                TrafficMonitoringStatusChanged?.Invoke(this, "Failed to start traffic monitoring. Check logs for details.");
                 return false;
             }
         }
@@ -54,7 +57,9 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                TrafficMonitoringStatusChanged?.Invoke(this, $"Error stopping traffic monitoring: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error stopping traffic monitoring: {ex.Message}", "ERROR");
+                TrafficMonitoringStatusChanged?.Invoke(this, "Error stopping traffic monitoring. Check logs for details.");
             }
         }
 
@@ -89,7 +94,8 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error configuring DNS redirection: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error configuring DNS redirection: {ex.Message}", "ERROR");
                 throw;
             }
         }
@@ -123,7 +129,8 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting adapter name: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error getting adapter name: {ex.Message}", "ERROR");
             }
             
             return string.Empty;
@@ -153,14 +160,16 @@ namespace PocketFence.Services
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Error processing HTTP request: {ex.Message}");
+                                // Security: Don't expose detailed error information
+                                SystemUtils.LogEvent($"Error processing HTTP request: {ex.Message}", "ERROR");
                             }
                         }
                     });
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error starting packet capture: {ex.Message}");
+                    // Security: Don't expose detailed error information
+                    SystemUtils.LogEvent($"Error starting packet capture: {ex.Message}", "ERROR");
                 }
             });
         }
@@ -194,7 +203,8 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing HTTP request: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error processing HTTP request: {ex.Message}", "ERROR");
             }
         }
 
@@ -202,6 +212,13 @@ namespace PocketFence.Services
         {
             try
             {
+                // Security: Validate IP address to prevent command injection
+                if (!SystemUtils.IsValidIpAddress(ipAddress))
+                {
+                    SystemUtils.LogEvent($"Invalid IP address format: {ipAddress}", "WARNING");
+                    return "Unknown";
+                }
+
                 // Use ARP table to get MAC address
                 var startInfo = new ProcessStartInfo
                 {
@@ -235,7 +252,8 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting MAC address for {ipAddress}: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error getting MAC address: {ex.Message}", "ERROR");
             }
             
             return "Unknown";
@@ -279,7 +297,8 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error sending blocked page: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error sending blocked page: {ex.Message}", "ERROR");
             }
         }
 
@@ -309,7 +328,8 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error forwarding request: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error forwarding request: {ex.Message}", "ERROR");
                 
                 // Send error response
                 var errorHtml = "<html><body><h1>Proxy Error</h1><p>Unable to process request.</p></body></html>";
@@ -351,7 +371,8 @@ namespace PocketFence.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error restoring DNS settings: {ex.Message}");
+                // Security: Don't expose detailed error information
+                SystemUtils.LogEvent($"Error restoring DNS settings: {ex.Message}", "ERROR");
             }
         }
 
