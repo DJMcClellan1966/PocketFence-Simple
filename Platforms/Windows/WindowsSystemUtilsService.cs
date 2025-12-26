@@ -1,7 +1,9 @@
 using PocketFence_Simple.Interfaces;
 using System.Security.Principal;
 using System.Diagnostics;
+#if WINDOWS
 using System.Management;
+#endif
 
 namespace PocketFence_Simple.Platforms.Windows
 {
@@ -9,13 +11,19 @@ namespace PocketFence_Simple.Platforms.Windows
     {
         public bool IsRunningAsAdministrator()
         {
+#if WINDOWS
             var identity = WindowsIdentity.GetCurrent();
             var principal = new WindowsPrincipal(identity);
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
+#else
+            // For web applications, administrator checks are handled at the application level
+            return false;
+#endif
         }
 
         public void RestartAsAdministrator()
         {
+#if WINDOWS
             try
             {
                 var currentProcess = Process.GetCurrentProcess();
@@ -36,8 +44,13 @@ namespace PocketFence_Simple.Platforms.Windows
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Failed to restart as administrator: {ex.Message}");
+                // Handle the exception for Windows platform
+                Console.WriteLine($"Failed to restart as administrator: {ex.Message}");
             }
+#else
+            // For web applications, restart functionality is handled differently
+            throw new NotSupportedException("Administrator restart is not supported in web applications");
+#endif
         }
 
         public bool CheckSystemVersion()

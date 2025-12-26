@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PocketFence Dashboard</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1976D2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <style>
+        :root {
+            --primary: #1976D2;
+            --primary-variant: #0D47A1;
+            --secondary: #03DAC6;
+            --background: #FAFAFA;
+            --surface: #FFFFFF;
+            --success: #2E7D32;
+            --success-light: #E8F5E8;
+            --warning: #ED6C02;
+            --warning-light: #FFF3E0;
+            --danger: #D32F2F;
+            --danger-light: #FFEBEE;
+            --info: #0288D1;
+            --info-light: #E1F5FE;
+            --text-primary: #212121;
+            --text-secondary: #757575;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-variant));
+            color: white;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+        .grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+        .card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .card.success { background-color: var(--success-light); border-left: 4px solid var(--success); }
+        .card.warning { background-color: var(--warning-light); border-left: 4px solid var(--warning); }
+        .card.danger { background-color: var(--danger-light); border-left: 4px solid var(--danger); }
+        .card.info { background-color: var(--info-light); border-left: 4px solid var(--info); }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        .btn:hover { background: var(--primary-variant); }
+        .btn.success { background: var(--success); }
+        .btn.warning { background: var(--warning); }
+        .btn.danger { background: var(--danger); }
+
+        .toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 0.5rem 0;
+        }
+
+        .switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background: #ccc;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .switch.active { background: var(--success); }
+
+        .switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 26px;
+            height: 26px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .switch.active::after { transform: translateX(30px); }
+
+        .status-online { color: var(--success); }
+        .status-offline { color: var(--danger); }
+        .status-warning { color: var(--warning); }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .activity-item:last-child { border-bottom: none; }
+
+        .activity-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            text-align: center;
+        }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-time {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        /* AI-specific styles */
+        .ai-chat-container {
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .ai-chat-messages {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-y: auto;
+            max-height: 300px;
+        }
+
+        .ai-message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+        }
+
+        .ai-message.user {
+            background: var(--primary-light, #e3f2fd);
+            margin-left: 2rem;
+            text-align: right;
+        }
+
+        .ai-message.assistant {
+            background: var(--success-light);
+            margin-right: 2rem;
+        }
+
+        .ai-chat-input {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .ai-chat-input input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .ai-quick-actions {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .ai-quick-actions h3 {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .ai-quick-actions button {
+            margin: 0.25rem 0.5rem 0.25rem 0;
+        }
+
+        .insight-item {
+            background: var(--surface);
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .insight-item.critical {
+            border-left: 4px solid var(--danger);
+            background: var(--danger-light);
+        }
+
+        .insight-item.warning {
+            border-left: 4px solid var(--warning);
+            background: var(--warning-light);
+        }
+
+        .insight-item.info {
+            border-left: 4px solid var(--info);
+            background: var(--info-light);
+        }
+
+        .insight-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .insight-title {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .insight-confidence {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            background: rgba(0,0,0,0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .insight-description {
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            line-height: 1.5;
+        }
+
+        .insight-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .threat-alert-item {
+            background: var(--surface);
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .threat-alert-item.critical {
+            border-left: 4px solid var(--danger);
+            background: var(--danger-light);
+        }
+
+        .threat-alert-item.high {
+            border-left: 4px solid var(--warning);
+            background: var(--warning-light);
+        }
+
+        .threat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .threat-level {
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            color: white;
+        }
+
+        .threat-level.critical {
+            background: var(--danger);
+        }
+
+        .threat-level.high {
+            background: var(--warning);
+        }
+
+        .threat-level.medium {
+            background: var(--info);
+        }
+
+        .threat-details {
+            margin: 0.75rem 0;
+        }
+
+        .threat-url {
+            font-family: monospace;
+            background: rgba(0,0,0,0.05);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            word-break: break-all;
+            font-size: 0.9rem;
+        }
+
+        .ai-action-item {
+            background: var(--surface);
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .action-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .action-status {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: var(--success);
+            color: white;
+        }
+
+        .action-justification {
+            font-style: italic;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: rgba(0,0,0,0.02);
+            border-radius: 4px;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--danger);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .ai-status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+
+        .ai-status-indicator.active {
+            background: var(--success);
+        }
+
+        .ai-status-indicator.warning {
+            background: var(--warning);
+        }
+
+        .ai-status-indicator.error {
+            background: var(--danger);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        @media (max-width: 768px) {
+            .container { padding: 1rem; }
+            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.5rem; }
+            .card { padding: 1rem; }
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .online-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(46, 125, 50, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>
+                🛡️ PocketFence Dashboard
+                <span class="online-indicator"></span>
+            </h1>
+            <p>Cross-Platform Parental Control • Access from any device</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- System Status -->
+        <h2 class="section-title">System Status</h2>
+        <div class="grid grid-2">
+            <div class="card info">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">🔥</span>
+                    <span class="card-title">Hotspot Status</span>
+                </div>
+                <div class="toggle">
+                    <span id="hotspot-status">Disabled</span>
+                    <div class="switch" id="hotspot-toggle"></div>
+                </div>
+                <button class="btn" onclick="toggleHotspot()">Enable Hotspot</button>
+            </div>
+
+            <div class="card success">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">📱</span>
+                    <span class="card-title">Connected Devices</span>
+                </div>
+                <div class="metric-value" id="device-count">0</div>
+                <div class="metric-label">devices connected</div>
+                <button class="btn success" onclick="showDevices()">View Devices</button>
+            </div>
+        </div>
+
+        <!-- AI Insights & Notifications -->
+        <h2 class="section-title">🤖 AI Security Assistant</h2>
+        <div class="grid grid-4">
+            <div class="card info" style="position: relative;">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">🧠</span>
+                    <span class="card-title">AI Insights</span>
+                </div>
+                <div class="metric-value" id="active-insights">3</div>
+                <div class="metric-label">active insights</div>
+                <button class="btn info" onclick="showAIInsights()">View All</button>
+                <div class="notification-badge" id="insights-badge">!</div>
+            </div>
+
+            <div class="card warning">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">🚨</span>
+                    <span class="card-title">Threat Alerts</span>
+                </div>
+                <div class="metric-value" id="threat-alerts">2</div>
+                <div class="metric-label">require attention</div>
+                <button class="btn warning" onclick="showThreatAlerts()">Review</button>
+            </div>
+
+            <div class="card success">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">🔒</span>
+                    <span class="card-title">AI Actions</span>
+                </div>
+                <div class="metric-value" id="ai-actions">15</div>
+                <div class="metric-label">automated today</div>
+                <button class="btn success" onclick="showAIActions()">View Actions</button>
+            </div>
+
+            <div class="card info">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">🤖</span>
+                    <span class="card-title">AI Assistant</span>
+                </div>
+                <div class="metric-value">Ready</div>
+                <div class="metric-label">ask me anything</div>
+                <button class="btn info" onclick="openAIAssistant()">Chat Now</button>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <h2 class="section-title">Today's Statistics</h2>
+        <div class="grid grid-4">
+            <div class="card danger">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">🚫</span>
+                    <span class="card-title">Blocked</span>
+                </div>
+                <div class="metric-value" id="blocked-count" style="color: var(--danger);">0</div>
+                <div class="metric-label">requests blocked</div>
+            </div>
+
+            <div class="card info">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">📊</span>
+                    <span class="card-title">Data Used</span>
+                </div>
+                <div class="metric-value" id="data-usage" style="color: var(--info);">0 MB</div>
+                <div class="metric-label">total bandwidth</div>
+            </div>
+
+            <div class="card success">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">🛡️</span>
+                    <span class="card-title">Active Rules</span>
+                </div>
+                <div class="metric-value" id="active-rules" style="color: var(--success);">0</div>
+                <div class="metric-label">filter rules</div>
+            </div>
+
+            <div class="card warning">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">⚠️</span>
+                    <span class="card-title">Warnings</span>
+                </div>
+                <div class="metric-value" id="warning-count" style="color: var(--warning);">0</div>
+                <div class="metric-label">security alerts</div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <h2 class="section-title">Quick Actions</h2>
+        <div class="grid grid-3">
+            <div class="card">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">🛡️</span>
+                    <span class="card-title">Content Filter</span>
+                </div>
+                <div class="toggle">
+                    <span>Filtering Enabled</span>
+                    <div class="switch active" id="filter-toggle"></div>
+                </div>
+                <button class="btn" onclick="configureFilters()">Configure Rules</button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">🌐</span>
+                    <span class="card-title">Network Monitor</span>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">Real-time traffic monitoring</p>
+                <button class="btn" onclick="viewNetworkStats()">View Network</button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">⚙️</span>
+                    <span class="card-title">Settings</span>
+                </div>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">Configure application settings</p>
+                <button class="btn" onclick="openSettings()">Open Settings</button>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <h2 class="section-title">Recent Activity</h2>
+        <div class="card">
+            <div id="activity-list">
+                <!-- Activity items will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- AI Assistant Modal -->
+        <div id="ai-assistant-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>🤖 AI Parental Assistant</h2>
+                    <button class="close-btn" onclick="closeAIAssistant()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="ai-chat-container">
+                        <div id="ai-chat-messages" class="ai-chat-messages"></div>
+                        <div class="ai-chat-input">
+                            <input type="text" id="ai-question" placeholder="Ask me about parenting, navigation, or get insights..." />
+                            <button onclick="sendAIMessage()">Send</button>
+                        </div>
+                    </div>
+                    <div class="ai-quick-actions">
+                        <h3>Quick Actions</h3>
+                        <button class="btn info" onclick="getNavigationHelp()">Navigation Help</button>
+                        <button class="btn warning" onclick="analyzeThreats()">Analyze Threats</button>
+                        <button class="btn success" onclick="getParentingTips()">Parenting Tips</button>
+                        <button class="btn secondary" onclick="checkSystemHealth()">System Health</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Insights Modal -->
+        <div id="ai-insights-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>🧠 AI Insights & Pattern Analysis</h2>
+                    <button class="close-btn" onclick="closeAIInsights()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="insights-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Threat Alerts Modal -->
+        <div id="threat-alerts-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>🚨 AI Threat Detection & Alerts</h2>
+                    <button class="close-btn" onclick="closeThreatAlerts()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="threat-alerts-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Actions Log Modal -->
+        <div id="ai-actions-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>🔒 Autonomous AI Actions Log</h2>
+                    <button class="close-btn" onclick="closeAIActions()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="ai-actions-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/dashboard.js"></script>
+    <script>
+        // AI Assistant Functions
+        function openAIAssistant() {
+            document.getElementById('ai-assistant-modal').style.display = 'block';
+            loadAIConversationHistory();
+        }
+
+        function closeAIAssistant() {
+            document.getElementById('ai-assistant-modal').style.display = 'none';
+        }
+
+        function sendAIMessage() {
+            const input = document.getElementById('ai-question');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addAIMessage(message, 'user');
+            input.value = '';
+
+            // Simulate AI response
+            setTimeout(() => {
+                const response = generateAIResponse(message);
+                addAIMessage(response, 'assistant');
+            }, 1000);
+        }
+
+        function addAIMessage(message, sender) {
+            const messagesContainer = document.getElementById('ai-chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `ai-message ${sender}`;
+            messageDiv.innerHTML = `
+                <div style="font-weight: 600; margin-bottom: 0.25rem;">${sender === 'user' ? 'You' : '🤖 AI Assistant'}</div>
+                <div>${message}</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">${new Date().toLocaleTimeString()}</div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function generateAIResponse(userMessage) {
+            const lowerMessage = userMessage.toLowerCase();
+            
+            if (lowerMessage.includes('threat') || lowerMessage.includes('danger')) {
+                return 'I have analyzed recent threats and found 2 high-risk attempts blocked in the last 24 hours. The AI system automatically blocked suspicious domains and inappropriate content. Would you like me to show you the detailed threat analysis or help you adjust security settings?';
+            } else if (lowerMessage.includes('device') || lowerMessage.includes('child')) {
+                return 'Looking at device usage patterns, I notice increased activity during evening hours. Based on behavioral analysis, I recommend setting up time-based restrictions and having a conversation about digital wellness. Would you like me to suggest specific conversation starters?';
+            } else if (lowerMessage.includes('filter') || lowerMessage.includes('block')) {
+                return 'Your content filters are working well! I have automatically updated threat detection patterns based on new online dangers. I can help you customize filtering rules, add specific websites to block/allow lists, or set up time-based content restrictions.';
+            } else if (lowerMessage.includes('help') || lowerMessage.includes('how')) {
+                return 'I am here to help you navigate PocketFence and provide parenting insights! I can help with: 🔧 Setting up filters and restrictions, 📊 Understanding usage patterns and insights, 🛡️ Analyzing security threats, 👨‍👩‍👧‍👦 Parenting guidance and conversation starters. What would you like help with?';
+            } else {
+                return 'I understand you are looking for guidance. Based on current patterns, your family internet usage is generally healthy with good security protection active. I am continuously monitoring for threats and can provide real-time insights. Is there a specific concern you would like me to analyze?';
+            }
+        }
+
+        // Quick action functions
+        function getNavigationHelp() {
+            addAIMessage('Help me navigate the app', 'user');
+            setTimeout(() => {
+                addAIMessage('Here are the main sections: 📊 Dashboard - Overview of all activity and AI insights, 📱 Connected Devices - Manage individual device settings, 🛡️ Content Filters - Set up blocking rules and restrictions, 🚨 Security - View threats and AI actions, ⚙️ Settings - Configure AI behavior and notifications. Which section would you like help with?', 'assistant');
+            }, 500);
+        }
+
+        function analyzeThreats() {
+            addAIMessage('Analyze recent threats for me', 'user');
+            setTimeout(() => {
+                addAIMessage('📊 Threat Analysis Summary:\n\n🚨 2 critical threats blocked automatically\n⚠️ 8 medium-risk sites filtered\n✅ 15 AI actions taken without intervention\n\nMost common threats: Social media bypassing attempts, Gaming site ads, Suspicious download links\n\nRecommendation: Your current settings are effective. Consider discussing online gaming safety with family members.', 'assistant');
+            }, 500);
+        }
+
+        function getParentingTips() {
+            addAIMessage('Give me parenting tips based on our usage patterns', 'user');
+            setTimeout(() => {
+                addAIMessage('👨‍👩‍👧‍👦 Personalized Parenting Tips:\n\n1. **Peak Usage Time**: Most activity happens 3-8 PM. Great time for "homework first" discussions.\n\n2. **Educational Balance**: 70% of blocked content was educational research. Consider allowlisting educational sites.\n\n3. **Conversation Starter**: "I noticed you have been exploring different topics online. What is the most interesting thing you learned this week?"\n\n4. **Positive Reinforcement**: Praise good digital choices when you see them!', 'assistant');
+            }, 500);
+        }
+
+        function checkSystemHealth() {
+            addAIMessage('How is the AI system performing?', 'user');
+            setTimeout(() => {
+                addAIMessage('🤖 AI System Health Report:\n\n✅ All AI modules operational\n📊 System load: 23% (optimal)\n🧠 Threat detection accuracy: 97.8%\n🔄 Auto-recovery: 3 successful recoveries today\n📈 Learning: 15 new patterns identified\n⚡ Response time: <150ms average\n\nStatus: Excellent! Your AI protection is running smoothly and learning continuously.', 'assistant');
+            }, 500);
+        }
+
+        function loadAIConversationHistory() {
+            const messages = [
+                { text: 'Welcome! I am your AI parental assistant. How can I help you today?', sender: 'assistant' }
+            ];
+            
+            const container = document.getElementById('ai-chat-messages');
+            container.innerHTML = '';
+            
+            messages.forEach(msg => {
+                addAIMessage(msg.text, msg.sender);
+            });
+        }
+
+        // AI Insights Functions
+        function showAIInsights() {
+            document.getElementById('ai-insights-modal').style.display = 'block';
+            loadAIInsights();
+        }
+
+        function closeAIInsights() {
+            document.getElementById('ai-insights-modal').style.display = 'none';
+        }
+
+        function loadAIInsights() {
+            const container = document.getElementById('insights-container');
+            container.innerHTML = `
+                <div class="insight-item warning">
+                    <div class="insight-header">
+                        <div class="insight-title">📊 High Screen Time Pattern Detected</div>
+                        <div class="insight-confidence">Confidence: 94%</div>
+                    </div>
+                    <div class="insight-description">
+                        AI analysis shows device usage averaging 6.2 hours daily, 40% above recommended limits for age group. Peak usage occurs during homework hours (4-6 PM).
+                    </div>
+                    <div class="insight-actions">
+                        <button class="btn warning" onclick="alert('⏰ Time limits can be configured in Device Management settings')">Set Time Limits</button>
+                        <button class="btn secondary" onclick="alert('🛑 Break reminders will notify users every 2 hours during heavy usage')">Schedule Breaks</button>
+                        <button class="btn info" onclick="openAIAssistant()">Conversation Tips</button>
+                    </div>
+                </div>
+
+                <div class="insight-item info">
+                    <div class="insight-header">
+                        <div class="insight-title">🎓 Educational Content Preference</div>
+                        <div class="insight-confidence">Confidence: 87%</div>
+                    </div>
+                    <div class="insight-description">
+                        78% of internet activity is educational or research-related. Strong indication of academic motivation and curiosity.
+                    </div>
+                    <div class="insight-actions">
+                        <button class="btn success" onclick="alert('🎓 Educational sites will be given priority access with relaxed filtering')">Allow Educational Sites</button>
+                        <button class="btn info" onclick="alert('🌟 Encouraging healthy exploration while maintaining safety guidelines')">Encourage Exploration</button>
+                    </div>
+                </div>
+
+                <div class="insight-item critical">
+                    <div class="insight-header">
+                        <div class="insight-title">🌙 Late Night Usage Concern</div>
+                        <div class="insight-confidence">Confidence: 92%</div>
+                    </div>
+                    <div class="insight-description">
+                        Significant device usage detected after 10 PM on school nights. This may impact sleep quality and academic performance.
+                    </div>
+                    <div class="insight-actions">
+                        <button class="btn danger" onclick="alert('🌙 Bedtime restrictions will automatically limit access after specified hours')">Set Bedtime Limits</button>
+                        <button class="btn warning" onclick="alert('🚫 Creating device-free zones in bedrooms improves sleep quality')">Device-Free Bedroom</button>
+                        <button class="btn info" onclick="openAIAssistant()">Sleep Discussion Tips</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Threat Alerts Functions
+        function showThreatAlerts() {
+            document.getElementById('threat-alerts-modal').style.display = 'block';
+            loadThreatAlerts();
+        }
+
+        function closeThreatAlerts() {
+            document.getElementById('threat-alerts-modal').style.display = 'none';
+        }
+
+        function loadThreatAlerts() {
+            const container = document.getElementById('threat-alerts-container');
+            container.innerHTML = `
+                <div class="threat-alert-item critical">
+                    <div class="threat-header">
+                        <div>
+                            <strong>Sarah's iPhone</strong> - <span class="threat-level critical">Critical</span>
+                        </div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);">2 minutes ago</div>
+                    </div>
+                    <div class="threat-details">
+                        <p><strong>Threat:</strong> Malicious download attempt blocked</p>
+                        <p><strong>URL:</strong> <span class="threat-url">suspicious-games-download.tk/malware.exe</span></p>
+                        <p><strong>AI Action:</strong> Automatically blocked domain and quarantined device temporarily</p>
+                        <p><strong>Risk Indicators:</strong> Known malware signature, suspicious domain, executable download attempt</p>
+                    </div>
+                    <div class="insight-actions">
+                        <button class="btn danger" onclick="alert('🔍 Threat contains Trojan.GenKD malware attempting to steal personal data. AI decision was correct.')">Review Details</button>
+                        <button class="btn warning" onclick="promptOverride('threat-1')">Override AI Decision</button>
+                        <button class="btn success" onclick="alert('✅ AI action approved. This helps improve future threat detection accuracy.')">Approve AI Action</button>
+                    </div>
+                </div>
+
+                <div class="threat-alert-item high">
+                    <div class="threat-header">
+                        <div>
+                            <strong>Alex's Laptop</strong> - <span class="threat-level high">High</span>
+                        </div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);">1 hour ago</div>
+                    </div>
+                    <div class="threat-details">
+                        <p><strong>Threat:</strong> Social media bypass attempt</p>
+                        <p><strong>URL:</strong> <span class="threat-url">proxy-unblock-social.com/instagram</span></p>
+                        <p><strong>AI Action:</strong> Blocked proxy site and logged attempt</p>
+                        <p><strong>Risk Indicators:</strong> Proxy service, attempting to bypass parental controls</p>
+                    </div>
+                    <div class="insight-actions">
+                        <button class="btn warning" onclick="openAIAssistant()">Discuss with Child</button>
+                        <button class="btn info" onclick="alert('⚙️ Time restrictions can be adjusted in device settings to allow supervised access')">Adjust Time Limits</button>
+                        <button class="btn secondary" onclick="alert('📊 Full activity log shows mostly educational content with occasional social media attempts')">View Full Activity</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // AI Actions Functions
+        function showAIActions() {
+            document.getElementById('ai-actions-modal').style.display = 'block';
+            loadAIActions();
+        }
+
+        function closeAIActions() {
+            document.getElementById('ai-actions-modal').style.display = 'none';
+        }
+
+        function loadAIActions() {
+            const container = document.getElementById('ai-actions-container');
+            container.innerHTML = `
+                <div class="ai-action-item">
+                    <div class="action-header">
+                        <div>
+                            <strong>Automatic Threat Block</strong>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary);">Sarah's iPhone - 2 min ago</div>
+                        </div>
+                        <div class="action-status">Executed</div>
+                    </div>
+                    <p>Blocked malicious download attempt and temporarily restricted device access</p>
+                    <div class="action-justification">
+                        <strong>AI Reasoning:</strong> High-confidence malware detection (97.8% certainty) triggered automatic protective response. Domain matched known malware signatures in threat database.
+                    </div>
+                </div>
+
+                <div class="ai-action-item">
+                    <div class="action-header">
+                        <div>
+                            <strong>Content Filter Update</strong>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary);">System-wide - 15 min ago</div>
+                        </div>
+                        <div class="action-status">Applied</div>
+                    </div>
+                    <p>Updated threat detection patterns based on new cybersecurity intelligence</p>
+                    <div class="action-justification">
+                        <strong>AI Reasoning:</strong> Learned from 23 new threat patterns observed across the network. Preemptively updating filters to protect against emerging threats.
+                    </div>
+                </div>
+
+                <div class="ai-action-item">
+                    <div class="action-header">
+                        <div>
+                            <strong>Usage Pattern Alert</strong>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary);">Alex's Laptop - 1 hour ago</div>
+                        </div>
+                        <div class="action-status">Notified</div>
+                    </div>
+                    <p>Generated parental guidance recommendation for late-night usage pattern</p>
+                    <div class="action-justification">
+                        <strong>AI Reasoning:</strong> Detected 3+ consecutive nights of device usage past 11 PM. Research indicates this may impact sleep quality and academic performance.
+                    </div>
+                </div>
+            `;
+        }
+
+        // Helper functions
+        function promptOverride(threatId) {
+            const reason = prompt('Please provide a reason for overriding AI decision:');
+            if (reason) {
+                alert(`✅ AI action overridden for ${threatId}.\nReason: ${reason}\nNote: AI will learn from this decision to improve future recommendations.`);
+            }
+        }
+
+        // Add Enter key support for AI chat
+        document.addEventListener('DOMContentLoaded', function() {
+            const aiInput = document.getElementById('ai-question');
+            if (aiInput) {
+                aiInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        sendAIMessage();
+                    }
+                });
+            }
+        });
+
+        // Real-time AI statistics updates
+        function updateAIStats() {
+            const aiActions = document.getElementById('ai-actions');
+            const threatAlerts = document.getElementById('threat-alerts');
+            const activeInsights = document.getElementById('active-insights');
+            
+            if (aiActions) {
+                const current = parseInt(aiActions.textContent);
+                aiActions.textContent = Math.min(current + Math.floor(Math.random() * 2), 50);
+            }
+            
+            if (Math.random() < 0.1 && threatAlerts) { // 10% chance of new threat
+                const current = parseInt(threatAlerts.textContent);
+                threatAlerts.textContent = Math.max(current + Math.floor(Math.random() * 2) - 1, 0);
+            }
+            
+            if (activeInsights && Math.random() < 0.05) { // 5% chance of new insight
+                const current = parseInt(activeInsights.textContent);
+                activeInsights.textContent = Math.min(current + 1, 10);
+            }
+        }
+
+        // Initialize dashboard and AI updates
+        initializeDashboard();
+        setInterval(updateAIStats, 30000); // Update every 30 seconds
+    </script>
+</body>
+</html>

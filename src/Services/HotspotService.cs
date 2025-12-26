@@ -1,4 +1,6 @@
+#if WINDOWS
 using System.Management;
+#endif
 using System.Net;
 using System.Net.NetworkInformation;
 using PocketFence_Simple.Models;
@@ -13,6 +15,8 @@ namespace PocketFence_Simple.Services
         public event EventHandler<string>? HotspotStatusChanged;
         public event EventHandler<ConnectedDevice>? DeviceConnected;
         public event EventHandler<ConnectedDevice>? DeviceDisconnected;
+        
+        public bool IsActive => _isHotspotEnabled;
 
         public async Task<bool> EnableHotspotAsync(string ssid, string password)
         {
@@ -141,7 +145,8 @@ namespace PocketFence_Simple.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting connected devices: {ex.Message}");
+                // Log error instead of console output
+                System.Diagnostics.Debug.WriteLine($"Error getting connected devices: {ex.Message}");
             }
             
             return devices;
@@ -296,7 +301,7 @@ namespace PocketFence_Simple.Services
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error in device monitoring: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"Error in device monitoring: {ex.Message}");
                         await Task.Delay(10000); // Wait longer on error
                     }
                 }

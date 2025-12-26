@@ -1,7 +1,9 @@
 using PocketFence_Simple.Interfaces;
 using PocketFence_Simple.Models;
 using System.Diagnostics;
+#if WINDOWS
 using System.Management;
+#endif
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -23,20 +25,25 @@ namespace PocketFence_Simple.Platforms.Windows
 #pragma warning restore CS0067
         public event EventHandler<string>? TrafficMonitoringStatusChanged;
 
+        private static ProcessStartInfo CreateNetshProcessStartInfo(string arguments)
+        {
+            return new ProcessStartInfo
+            {
+                FileName = "netsh",
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                Verb = "runas"
+            };
+        }
+
         public async Task<bool> EnableHotspotAsync(string ssid, string password)
         {
             try
             {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "netsh",
-                    Arguments = $"wlan set hostednetwork mode=allow ssid=\"{ssid}\" key=\"{password}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    Verb = "runas"
-                };
+                var startInfo = CreateNetshProcessStartInfo($"wlan set hostednetwork mode=allow ssid=\"{ssid}\" key=\"{password}\"");
 
                 using var process = Process.Start(startInfo);
                 if (process != null)
@@ -66,16 +73,7 @@ namespace PocketFence_Simple.Platforms.Windows
         {
             try
             {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "netsh",
-                    Arguments = "wlan stop hostednetwork",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    Verb = "runas"
-                };
+                var startInfo = CreateNetshProcessStartInfo("wlan stop hostednetwork");
 
                 using var process = Process.Start(startInfo);
                 if (process != null)

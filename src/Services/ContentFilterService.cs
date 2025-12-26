@@ -14,36 +14,54 @@ namespace PocketFence_Simple.Services
         private readonly string _configPath;
         private readonly ConcurrentDictionary<string, bool> _urlCache;
         private readonly ConcurrentDictionary<string, Regex> _regexCache;
+        private bool _isEnabled = true;
 
         public event EventHandler<BlockedSite>? SiteBlocked;
+        
+        public bool IsEnabled => _isEnabled;
 
+        public List<FilterRule> GetFilterRules()
+        {
+            return _filterRules.ToList();
+        }
+
+        public void AddFilterRule(FilterRule rule)
+        {
+            if (string.IsNullOrEmpty(rule.Id))
+                rule.Id = Guid.NewGuid().ToString();
+            rule.CreatedAt = DateTime.Now;
+            _filterRules.Add(rule);
+            _ruleIndex[rule.Id] = rule; // O(1) index update
+            ClearCache(); // Clear cache when rules change
+            SaveConfiguration();
+        }
+
+        public void RemoveFilterRule(string ruleId)
+        {
+            // O(1) lookup instead of O(n) FirstOrDefault
+            if (_ruleIndex.TryGetValue(ruleId, out var rule))
+            {
+                _filterRules.Remove(rule);
+                _ruleIndex.Remove(ruleId); // O(1) index removal
+                ClearCache(); // Clear cache when rules change
+                SaveConfiguration();
+            }
+        }
+
+        // Async versions for UI compatibility
         public async Task<List<FilterRule>> GetFilterRulesAsync()
         {
-            return await Task.FromResult(_filterRules.ToList());
+            return await Task.FromResult(GetFilterRules());
         }
 
         public async Task AddFilterRuleAsync(FilterRule rule)
         {
-            await Task.Run(() =>
-            {
-                _filterRules.Add(rule);
-                _ruleIndex[rule.Id] = rule; // O(1) index update
-                SaveConfiguration();
-            });
+            await Task.Run(() => AddFilterRule(rule));
         }
 
         public async Task RemoveFilterRuleAsync(string ruleId)
         {
-            await Task.Run(() =>
-            {
-                // O(1) lookup instead of O(n) FirstOrDefault
-                if (_ruleIndex.TryGetValue(ruleId, out var rule))
-                {
-                    _filterRules.Remove(rule);
-                    _ruleIndex.Remove(ruleId); // O(1) index removal
-                    SaveConfiguration();
-                }
-            });
+            await Task.Run(() => RemoveFilterRule(ruleId));
         }
 
         public ContentFilterService()
@@ -63,34 +81,22 @@ namespace PocketFence_Simple.Services
         private void InitializeDefaultRules()
         {
             // Add default malicious content categories
-            var defaultCategories = new[]
+            var defaultCategories = new string[]
             {
-                "malware",
-                "phishing", 
-                "adult",
-                "gambling",
-                "violence",
-                "drugs",
-                "hate",
-                "fraud",
-                "spam"
+                "malware", "phishing", "adult", "gambling", "violence",
+                "drugs", "hate", "fraud", "spam"
             };
             
-            foreach (var category in defaultCategories)
-                _maliciousCategories.Add(category);
+            _maliciousCategories.UnionWith(defaultCategories);
 
             // Add default blocked domains (known malicious sites)
-            var defaultDomains = new[]
+            var defaultDomains = new string[]
             {
-                "malware-example.com",
-                "phishing-test.net",
-                "adult-content.org",
-                "gambling-site.com",
-                "violent-content.net"
+                "malware-example.com", "phishing-test.net", "adult-content.org",
+                "gambling-site.com", "violent-content.net"
             };
             
-            foreach (var domain in defaultDomains)
-                _blockedDomains.Add(domain);
+            _blockedDomains.UnionWith(defaultDomains);
 
             // Create default filter rules
             _filterRules.AddRange(new[]
@@ -192,9 +198,8 @@ namespace PocketFence_Simple.Services
                     
                 return shouldBlock;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Error checking URL {url}: {ex.Message}");
                 return false; // Allow on error
             }
         }
@@ -297,29 +302,7 @@ namespace PocketFence_Simple.Services
             File.AppendAllTextAsync(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "blocked_sites.log"), logEntry + Environment.NewLine);
         }
 
-        private int _nextRuleId = 1;
-        
-        public void AddFilterRule(FilterRule rule)
-        {
-            if (string.IsNullOrEmpty(rule.Id))
-                rule.Id = (_nextRuleId++).ToString();
-            rule.CreatedAt = DateTime.Now;
-            _filterRules.Add(rule);
-            ClearCache(); // Clear cache when rules change
-            SaveConfiguration();
-        }
 
-        public void RemoveFilterRule(string ruleId)
-        {
-            // O(1) lookup instead of O(n) FirstOrDefault
-            if (_ruleIndex.TryGetValue(ruleId, out var rule))
-            {
-                _filterRules.Remove(rule);
-                _ruleIndex.Remove(ruleId); // O(1) index removal
-                ClearCache();
-                SaveConfiguration();
-            }
-        }
 
         public void UpdateFilterRule(FilterRule updatedRule)
         {
@@ -385,9 +368,9 @@ namespace PocketFence_Simple.Services
                 
                 File.WriteAllText(_configPath, json);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Error saving configuration: {ex.Message}");
+                // Silently fail to avoid disrupting filtering
             }
         }
 
@@ -412,9 +395,9 @@ namespace PocketFence_Simple.Services
                     _ruleIndex[rule.Id] = rule;
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Error loading configuration: {ex.Message}");
+                // File doesn't exist or is invalid, use defaults
             }
         }
 

@@ -1,69 +1,55 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFrameworks>net9.0-windows10.0.19041.0</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">net9.0-windows10.0.19041.0</TargetFrameworks>
-    
-    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
     <RootNamespace>PocketFence_Simple</RootNamespace>
-    <UseMaui>true</UseMaui>
-    <SingleProject>true</SingleProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-
-    <!-- Enable compiled bindings with Source for better performance -->
-    <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+    <UseAppHost>true</UseAppHost>
 
     <!-- Display Version -->
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>2.0</ApplicationDisplayVersion>
+    <ApplicationVersion>2</ApplicationVersion>
 
-    <ApplicationTitle>PocketFence-Simple</ApplicationTitle>
-    <ApplicationId>com.pocketfence.simple</ApplicationId>
-    <ApplicationIdGuid>2c0e1a8e-8f5a-4b59-b5b1-7c1c0d8e4f5a</ApplicationIdGuid>
+    <!-- Windows Service Support -->
+    <WindowsServiceSupport>true</WindowsServiceSupport>
 
-    <!-- App Icon removed temporarily to avoid missing file error -->
-  </PropertyGroup>
-
-  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
-    <OutputType>WinExe</OutputType>
-    <UseWinUI>true</UseWinUI>
-    <WindowsPackageType>None</WindowsPackageType>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Platform Support -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::IsOSPlatform('windows'))">10.0.17763.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::IsOSPlatform('linux'))">0.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::IsOSPlatform('osx'))">10.14</SupportedOSPlatformVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Exclude old Windows Forms files -->
-    <Compile Remove="old_winforms\**" />
-    <None Remove="old_winforms\**" />
-    <EmbeddedResource Remove="old_winforms\**" />
+    <!-- ASP.NET Core Web Framework -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
     
-    <!-- Exclude old Windows Forms dependent files -->
-    <Compile Remove="src\Utils\SystemUtils.cs" />
+    <!-- SignalR for Real-time Updates -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.1.0" />
     
-    <!-- App Icon -->
-    <MauiIcon Include="Resources/AppIcon/appicon.svg" ForegroundFile="Resources/AppIcon/appiconfg.svg" Color="#512BD4" />
-
-    <!-- Splash Screen -->
-    <MauiSplashScreen Include="Resources/Splash/splash.svg" Color="#512BD4" BaseSize="128,128" />
-
-    <!-- Images -->
-    <MauiImage Include="Resources/Images/*" />
-    <MauiImage Update="Resources/Images/dotnet_bot.svg" BaseSize="168,208" />
-
-    <!-- Custom Fonts -->
-    <MauiFont Include="Resources/Fonts/*" />
-
-    <!-- Raw Assets (also remove the "Resources/Raw" prefix) -->
-    <MauiAsset Include="Resources/Raw/**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.10" />
-    <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.10" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+    <!-- Windows Service Support -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.0" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
+    
+    <!-- Linux/macOS Service Support -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="9.0.0" Condition="$([MSBuild]::IsOSPlatform('linux'))" />
+    
+    <!-- Network and System Libraries -->
     <PackageReference Include="System.Management" Version="10.0.1" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="9.1.0" />
+    <PackageReference Include="Microsoft.Win32.Registry" Version="6.0.0" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'" />
+    
+    <!-- JSON and Configuration -->
+    <PackageReference Include="System.Text.Json" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.1" />
+    
+    <!-- HTTP Client -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+    
+    <!-- Logging -->
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
   </ItemGroup>
 
 </Project>

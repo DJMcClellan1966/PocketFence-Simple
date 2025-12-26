@@ -83,13 +83,13 @@ namespace PocketFence_Simple.Services
                     if (process != null)
                     {
                         await process.WaitForExitAsync();
-                        Console.WriteLine($"DNS configured for adapter: {adapterName}");
+                        System.Diagnostics.Debug.WriteLine($"DNS configured for adapter: {adapterName}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error configuring DNS redirection: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error configuring DNS redirection: {ex.Message}");
                 throw;
             }
         }
@@ -123,7 +123,7 @@ namespace PocketFence_Simple.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting adapter name: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error getting adapter name: {ex.Message}");
             }
             
             return string.Empty;
@@ -140,7 +140,7 @@ namespace PocketFence_Simple.Services
                     listener.Prefixes.Add("http://127.0.0.1:8080/");
                     listener.Start();
                     
-                    Console.WriteLine("HTTP proxy started on port 8080");
+                    System.Diagnostics.Debug.WriteLine("HTTP proxy started on port 8080");
                     
                     Task.Run(async () =>
                     {
@@ -153,14 +153,14 @@ namespace PocketFence_Simple.Services
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Error processing HTTP request: {ex.Message}");
+                                System.Diagnostics.Debug.WriteLine($"Error processing HTTP request: {ex.Message}");
                             }
                         }
                     });
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error starting packet capture: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Error starting packet capture: {ex.Message}");
                 }
             });
         }
@@ -175,7 +175,7 @@ namespace PocketFence_Simple.Services
                 var url = request.Url?.ToString() ?? "";
                 var clientIp = request.RemoteEndPoint?.Address?.ToString() ?? "";
                 
-                Console.WriteLine($"Processing request: {url} from {clientIp}");
+                System.Diagnostics.Debug.WriteLine($"Processing request: {url} from {clientIp}");
                 
                 // Get device MAC address from IP (simplified)
                 var deviceMac = await GetMacAddressFromIp(clientIp);
@@ -194,7 +194,7 @@ namespace PocketFence_Simple.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing HTTP request: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error processing HTTP request: {ex.Message}");
             }
         }
 
@@ -238,7 +238,7 @@ namespace PocketFence_Simple.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting MAC address for {ipAddress}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error getting MAC address for {ipAddress}: {ex.Message}");
             }
             
             return "Unknown";
@@ -282,7 +282,7 @@ namespace PocketFence_Simple.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error sending blocked page: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error sending blocked page: {ex.Message}");
             }
         }
 
@@ -312,7 +312,7 @@ namespace PocketFence_Simple.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error forwarding request: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error forwarding request: {ex.Message}");
                 
                 // Send error response
                 var errorHtml = "<html><body><h1>Proxy Error</h1><p>Unable to process request.</p></body></html>";
@@ -348,13 +348,13 @@ namespace PocketFence_Simple.Services
                     if (process != null)
                     {
                         await process.WaitForExitAsync();
-                        Console.WriteLine("DNS settings restored");
+                        System.Diagnostics.Debug.WriteLine("DNS settings restored");
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Error restoring DNS settings: {ex.Message}");
+                // DNS configuration failed, continue without redirection
             }
         }
 
