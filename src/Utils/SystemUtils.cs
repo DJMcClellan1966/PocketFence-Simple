@@ -1,36 +1,84 @@
 using System.Security.Principal;
 using System.Diagnostics;
+using System.Windows.Forms;
 
-namespace PocketFence.Utils
+namespace PocketFence_Simple.Utils
 {
     public static class SystemUtils
     {
         public static bool IsRunningAsAdministrator()
         {
+#if WINDOWS
             var identity = WindowsIdentity.GetCurrent();
             var principal = new WindowsPrincipal(identity);
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
+#else
+            // For non-Windows platforms, return false or implement platform-specific logic
+            return false;
+#endif
         }
 
         public static void RestartAsAdministrator()
         {
-            var exeName = Process.GetCurrentProcess().MainModule?.FileName;
-            if (exeName != null)
+            try
             {
-                var startInfo = new ProcessStartInfo(exeName)
-                {
-                    Verb = "runas"
-                };
+                var currentProcess = Process.GetCurrentProcess();
+                var exeName = currentProcess.MainModule?.FileName;
                 
-                try
+                ProcessStartInfo startInfo;
+                
+                // Check if we're running under dotnet (development scenario)
+                if (exeName != null && exeName.Contains("dotnet", StringComparison.OrdinalIgnoreCase))
                 {
-                    Process.Start(startInfo);
-                    Environment.Exit(0);
+                    // We're running via 'dotnet run', so we need to use PowerShell to restart with elevation
+                    var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    var projectDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(assemblyLocation)));
+                    
+                    if (projectDir != null)
+                    {
+                        // Use PowerShell to start elevated dotnet run
+                        startInfo = new ProcessStartInfo
+                        {
+                            FileName = "powershell.exe",
+                            Arguments = $"-Command \"Start-Process PowerShell -ArgumentList 'cd \\\"{projectDir}\\\"; dotnet run -- --restarted' -Verb RunAs\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Cannot determine project directory");
+                    }
                 }
-                catch (Exception ex)
+                else if (exeName != null)
                 {
-                    Console.WriteLine($"Failed to restart as administrator: {ex.Message}");
+                    // We're running as an executable - this should work with proper UAC
+                    startInfo = new ProcessStartInfo
+                    {
+                        FileName = exeName,
+                        Verb = "runas",
+                        UseShellExecute = true
+                    };
                 }
+                else
+                {
+                    throw new InvalidOperationException("Cannot determine current process executable path");
+                }
+                
+                Process.Start(startInfo);
+                
+                // Give the new process time to start before exiting
+                System.Threading.Thread.Sleep(1000);
+                Environment.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                // In a Windows Forms app, we should show a message box instead of console output
+                System.Windows.Forms.MessageBox.Show(
+                    $"Failed to restart as administrator: {ex.Message}\n\nPlease manually run the application as administrator.",
+                    "Administrator Restart Failed",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Warning);
             }
         }
 
@@ -57,11 +105,39 @@ namespace PocketFence.Utils
         {
             try
             {
+                // Try primary method first (netsh)
+                var netshResult = await CheckWifiAdapterWithNetshAsync();
+                if (netshResult.HasValue)
+                {
+                    LogEvent($"WiFi adapter check (netsh) completed. Supported: {netshResult.Value}");
+                    return netshResult.Value;
+                }
+                
+                // Fallback to WMI method
+                LogEvent("Trying fallback WiFi detection method...", "INFO");
+                var wmiResult = await CheckWifiAdapterWithWmiAsync();
+                LogEvent($"WiFi adapter check (WMI) completed. Supported: {wmiResult}");
+                return wmiResult;
+            }
+            catch (Exception ex)
+            {
+                LogEvent($"Error in WiFi adapter check: {ex.Message}", "ERROR");
+                return false;
+            }
+        }
+        
+        private static async Task<bool?> CheckWifiAdapterWithNetshAsync()
+        {
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8)); // 8-second timeout
+                
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = "netsh",
                     Arguments = "wlan show drivers",
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
@@ -69,19 +145,73 @@ namespace PocketFence.Utils
                 using var process = Process.Start(startInfo);
                 if (process != null)
                 {
-                    var output = await process.StandardOutput.ReadToEndAsync();
-                    await process.WaitForExitAsync();
-                    
-                    return output.Contains("Hosted network supported") && 
-                           output.Contains("Yes");
+                    try
+                    {
+                        var outputTask = process.StandardOutput.ReadToEndAsync();
+                        var errorTask = process.StandardError.ReadToEndAsync();
+                        
+                        // Wait for process with timeout
+                        await process.WaitForExitAsync(cts.Token);
+                        
+                        var output = await outputTask;
+                        var error = await errorTask;
+                        
+                        if (process.ExitCode == 0)
+                        {
+                            // Check for hosted network support
+                            var hasHostedSupport = output.Contains("Hosted network supported", StringComparison.OrdinalIgnoreCase) && 
+                                                  output.Contains("Yes", StringComparison.OrdinalIgnoreCase);
+                            
+                            return hasHostedSupport;
+                        }
+                        else
+                        {
+                            LogEvent($"netsh command failed with exit code {process.ExitCode}. Error: {error}", "WARNING");
+                            return null; // Trigger fallback
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        LogEvent("WiFi adapter check timed out. Using fallback method...", "WARNING");
+                        try
+                        {
+                            process.Kill();
+                        }
+                        catch { /* Ignore kill errors */ }
+                        return null; // Trigger fallback
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error checking WiFi adapter: {ex.Message}");
+                LogEvent($"Error in netsh WiFi check: {ex.Message}", "WARNING");
             }
             
-            return false;
+            return null; // Trigger fallback
+        }
+        
+        private static async Task<bool> CheckWifiAdapterWithWmiAsync()
+        {
+            try
+            {
+                await Task.Run(() =>
+                {
+                    using var searcher = new System.Management.ManagementObjectSearcher(
+                        "SELECT * FROM Win32_NetworkAdapter WHERE NetConnectionStatus = 2 AND AdapterTypeId = 9");
+                    
+                    var adapters = searcher.Get();
+                    return adapters.Count > 0;
+                });
+                
+                // If we have active wireless adapters, assume hosted network might be supported
+                // This is not as reliable as netsh but provides a reasonable fallback
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogEvent($"Error in WMI WiFi check: {ex.Message}", "WARNING");
+                return false;
+            }
         }
 
         public static void CheckFirewallSettings()

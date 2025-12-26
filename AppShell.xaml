@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="PocketFence_Simple.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:PocketFence_Simple"
+    Shell.FlyoutBehavior="Flyout"
+    Title="PocketFence-Simple">
+
+    <Shell.FlyoutHeader>
+        <Grid BackgroundColor="#2196F3" HeightRequest="200">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Image Grid.Row="0" 
+                   Source="shield_icon.png"
+                   Aspect="AspectFit"
+                   HeightRequest="80"
+                   WidthRequest="80"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center" />
+            <Label Grid.Row="1"
+                   Text="PocketFence-Simple"
+                   FontSize="18"
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   HorizontalOptions="Center"
+                   Margin="0,0,0,20" />
+        </Grid>
+    </Shell.FlyoutHeader>
+
+    <FlyoutItem Title="Dashboard" Icon="home.png">
+        <ShellContent Route="MainPage" ContentTemplate="{DataTemplate local:MainPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Connected Devices" Icon="devices.png">
+        <ShellContent Route="DevicesPage" ContentTemplate="{DataTemplate local:DevicesPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Content Filter" Icon="filter.png">
+        <ShellContent Route="FilterPage" ContentTemplate="{DataTemplate local:FilterPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Network Monitor" Icon="network.png">
+        <ShellContent Route="NetworkPage" ContentTemplate="{DataTemplate local:NetworkPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Settings" Icon="settings.png">
+        <ShellContent Route="SettingsPage" ContentTemplate="{DataTemplate local:SettingsPage}" />
+    </FlyoutItem>
+
+</Shell>

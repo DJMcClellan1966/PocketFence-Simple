@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<svg width="456" height="456" viewBox="0 0 456 456" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="456" height="456" rx="72" fill="#512BD4"/>
+    <g transform="translate(91, 91)">
+        <!-- Shield icon representing security -->
+        <path d="M137 25L137 25C137 11.1929 125.807 0 112 0L112 0C98.1929 0 87 11.1929 87 25L87 25L87 50L62 50C48.1929 50 37 61.1929 37 75L37 200C37 213.807 48.1929 225 62 225L162 225C175.807 225 187 213.807 187 200L187 75C187 61.1929 175.807 50 162 50L137 50L137 25Z" 
+              fill="white" 
+              fill-opacity="0.9"/>
+        <!-- Network/WiFi icon -->
+        <circle cx="112" cy="125" r="12" fill="#512BD4"/>
+        <circle cx="112" cy="125" r="30" stroke="#512BD4" stroke-width="8" fill="none" opacity="0.6"/>
+        <circle cx="112" cy="125" r="50" stroke="#512BD4" stroke-width="8" fill="none" opacity="0.4"/>
+        <circle cx="112" cy="125" r="70" stroke="#512BD4" stroke-width="8" fill="none" opacity="0.2"/>
+    </g>
+</svg>

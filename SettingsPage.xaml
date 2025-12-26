@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:PocketFence_Simple"
+             x:Class="PocketFence_Simple.SettingsPage"
+             x:DataType="local:SettingsPage"
+             Title="Settings">
+    <ScrollView>
+        <StackLayout Padding="20">
+            <Label Text="Application Settings" 
+                   FontSize="Large" 
+                   FontAttributes="Bold" 
+                   Margin="0,0,0,20" />
+            
+            <!-- General Settings -->
+            <Frame BackgroundColor="LightGray" Margin="0,0,0,20">
+                <StackLayout>
+                    <Label Text="General" FontSize="16" FontAttributes="Bold" />
+                    
+                    <Grid Margin="0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <Label Grid.Column="0" Text="Start with Windows" VerticalTextAlignment="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding StartWithWindows}" />
+                    </Grid>
+                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <Label Grid.Column="0" Text="Minimize to System Tray" VerticalTextAlignment="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding MinimizeToTray}" />
+                    </Grid>
+                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <Label Grid.Column="0" Text="Show Notifications" VerticalTextAlignment="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding ShowNotifications}" />
+                    </Grid>
+                </StackLayout>
+            </Frame>
+            
+            <!-- Filter Settings -->
+            <Frame BackgroundColor="LightBlue" Margin="0,0,0,20">
+                <StackLayout>
+                    <Label Text="Content Filter" FontSize="16" FontAttributes="Bold" />
+                    
+                    <Grid Margin="0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <Label Grid.Column="0" Text="Enable Strict Mode" VerticalTextAlignment="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding StrictModeEnabled}" />
+                    </Grid>
+                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <Label Grid.Column="0" Text="Block HTTPS by Default" VerticalTextAlignment="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding BlockHttpsDefault}" />
+                    </Grid>
+                    
+                    <Label Text="Filter Update Frequency" />
+                    <Picker SelectedItem="{Binding FilterUpdateFrequency}">
+                        <Picker.ItemsSource>
+                            <x:Array Type="{x:Type x:String}">
+                                <x:String>Never</x:String>
+                                <x:String>Daily</x:String>
+                                <x:String>Weekly</x:String>
+                                <x:String>Monthly</x:String>
+                            </x:Array>
+                        </Picker.ItemsSource>
+                    </Picker>
+                </StackLayout>
+            </Frame>
+            
+            <!-- Network Settings -->
+            <Frame BackgroundColor="LightGreen" Margin="0,0,0,20">
+                <StackLayout>
+                    <Label Text="Network" FontSize="16" FontAttributes="Bold" />
+                    
+                    <Label Text="Default Hotspot Name (SSID)" />
+                    <Entry Text="{Binding DefaultHotspotSSID}" Placeholder="Enter hotspot name" />
+                    
+                    <Label Text="Default Password" />
+                    <Entry Text="{Binding DefaultHotspotPassword}" Placeholder="Enter password" IsPassword="True" />
+                    
+                    <Label Text="Maximum Connected Devices" />
+                    <Slider Minimum="1" Maximum="20" Value="{Binding MaxConnectedDevices}" />
+                    <Label Text="{Binding MaxConnectedDevices, StringFormat='{0:F0} devices'}" FontSize="12" TextColor="Gray" />
+                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <Label Grid.Column="0" Text="Auto-detect New Devices" VerticalTextAlignment="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding AutoDetectDevices}" />
+                    </Grid>
+                </StackLayout>
+            </Frame>
+            
+            <!-- Security Settings -->
+            <Frame BackgroundColor="LightYellow" Margin="0,0,0,20">
+                <StackLayout>
+                    <Label Text="Security" FontSize="16" FontAttributes="Bold" />
+                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <Label Grid.Column="0" Text="Require Admin Password" VerticalTextAlignment="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding RequireAdminPassword}" />
+                    </Grid>
+                    
+                    <Button Text="Change Admin Password" 
+                            Command="{Binding ChangePasswordCommand}"
+                            IsVisible="{Binding RequireAdminPassword}" />
+                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <Label Grid.Column="0" Text="Log All Activity" VerticalTextAlignment="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding LogAllActivity}" />
+                    </Grid>
+                    
+                    <Label Text="Log Retention (Days)" />
+                    <Slider Minimum="1" Maximum="365" Value="{Binding LogRetentionDays}" />
+                    <Label Text="{Binding LogRetentionDays, StringFormat='{0:F0} days'}" FontSize="12" TextColor="Gray" />
+                </StackLayout>
+            </Frame>
+            
+            <!-- Data Management -->
+            <Frame BackgroundColor="LightCoral" Margin="0,0,0,20">
+                <StackLayout>
+                    <Label Text="Data Management" FontSize="16" FontAttributes="Bold" />
+                    
+                    <Button Text="Clear Activity Logs" 
+                            Command="{Binding ClearLogsCommand}"
+                            BackgroundColor="Orange"
+                            TextColor="White" />
+                    
+                    <Button Text="Reset All Settings" 
+                            Command="{Binding ResetSettingsCommand}"
+                            BackgroundColor="Red"
+                            TextColor="White"
+                            Margin="0,10,0,0" />
+                    
+                    <Button Text="Export Configuration" 
+                            Command="{Binding ExportConfigCommand}"
+                            BackgroundColor="Blue"
+                            TextColor="White"
+                            Margin="0,10,0,0" />
+                    
+                    <Button Text="Import Configuration" 
+                            Command="{Binding ImportConfigCommand}"
+                            BackgroundColor="Green"
+                            TextColor="White"
+                            Margin="0,10,0,0" />
+                </StackLayout>
+            </Frame>
+            
+            <!-- About -->
+            <Frame BackgroundColor="DarkGray" Margin="0,0,0,20">
+                <StackLayout>
+                    <Label Text="About PocketFence" FontSize="16" FontAttributes="Bold" TextColor="White" />
+                    
+                    <Label Text="{Binding AppVersion}" TextColor="White" />
+                    <Label Text="Secure parental control for mobile hotspots" TextColor="White" FontSize="12" />
+                    
+                    <Button Text="Check for Updates" 
+                            Command="{Binding CheckUpdatesCommand}"
+                            BackgroundColor="DarkBlue"
+                            TextColor="White"
+                            Margin="0,10,0,0" />
+                    
+                    <Button Text="View License" 
+                            Command="{Binding ViewLicenseCommand}"
+                            BackgroundColor="DarkBlue"
+                            TextColor="White"
+                            Margin="0,10,0,0" />
+                </StackLayout>
+            </Frame>
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

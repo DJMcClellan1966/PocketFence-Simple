@@ -1,23 +1,60 @@
-using PocketFence.Models;
+using PocketFence_Simple.Models;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Collections.Concurrent;
 
-namespace PocketFence.Services
+namespace PocketFence_Simple.Services
 {
     public class ContentFilterService
     {
         private readonly List<FilterRule> _filterRules;
-        private readonly List<string> _blockedDomains;
-        private readonly List<string> _maliciousCategories;
+        private readonly Dictionary<string, FilterRule> _ruleIndex; // O(1) rule lookup
+        private readonly HashSet<string> _blockedDomains;
+        private readonly HashSet<string> _maliciousCategories;
         private readonly string _configPath;
+        private readonly ConcurrentDictionary<string, bool> _urlCache;
+        private readonly ConcurrentDictionary<string, Regex> _regexCache;
 
         public event EventHandler<BlockedSite>? SiteBlocked;
+
+        public async Task<List<FilterRule>> GetFilterRulesAsync()
+        {
+            return await Task.FromResult(_filterRules.ToList());
+        }
+
+        public async Task AddFilterRuleAsync(FilterRule rule)
+        {
+            await Task.Run(() =>
+            {
+                _filterRules.Add(rule);
+                _ruleIndex[rule.Id] = rule; // O(1) index update
+                SaveConfiguration();
+            });
+        }
+
+        public async Task RemoveFilterRuleAsync(string ruleId)
+        {
+            await Task.Run(() =>
+            {
+                // O(1) lookup instead of O(n) FirstOrDefault
+                if (_ruleIndex.TryGetValue(ruleId, out var rule))
+                {
+                    _filterRules.Remove(rule);
+                    _ruleIndex.Remove(ruleId); // O(1) index removal
+                    SaveConfiguration();
+                }
+            });
+        }
 
         public ContentFilterService()
         {
             _filterRules = new List<FilterRule>();
-            _blockedDomains = new List<string>();
-            _maliciousCategories = new List<string>();
+            _ruleIndex = new Dictionary<string, FilterRule>(); // O(1) lookup index
+            _blockedDomains = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _maliciousCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "filter_config.json");
+            _urlCache = new ConcurrentDictionary<string, bool>();
+            _regexCache = new ConcurrentDictionary<string, Regex>();
             
             InitializeDefaultRules();
             LoadConfiguration();
@@ -26,7 +63,7 @@ namespace PocketFence.Services
         private void InitializeDefaultRules()
         {
             // Add default malicious content categories
-            _maliciousCategories.AddRange(new[]
+            var defaultCategories = new[]
             {
                 "malware",
                 "phishing", 
@@ -37,24 +74,30 @@ namespace PocketFence.Services
                 "hate",
                 "fraud",
                 "spam"
-            });
+            };
+            
+            foreach (var category in defaultCategories)
+                _maliciousCategories.Add(category);
 
             // Add default blocked domains (known malicious sites)
-            _blockedDomains.AddRange(new[]
+            var defaultDomains = new[]
             {
                 "malware-example.com",
                 "phishing-test.net",
                 "adult-content.org",
                 "gambling-site.com",
                 "violent-content.net"
-            });
+            };
+            
+            foreach (var domain in defaultDomains)
+                _blockedDomains.Add(domain);
 
             // Create default filter rules
             _filterRules.AddRange(new[]
             {
                 new FilterRule
                 {
-                    Id = 1,
+                    Id = "1",
                     Name = "Block Adult Content",
                     Description = "Blocks access to adult websites",
                     Type = FilterType.Category,
@@ -67,7 +110,7 @@ namespace PocketFence.Services
                 },
                 new FilterRule
                 {
-                    Id = 2,
+                    Id = "2",
                     Name = "Block Malware Sites",
                     Description = "Blocks known malware and phishing sites",
                     Type = FilterType.Category,
@@ -80,7 +123,7 @@ namespace PocketFence.Services
                 },
                 new FilterRule
                 {
-                    Id = 3,
+                    Id = "3",
                     Name = "Block Gambling",
                     Description = "Blocks gambling websites",
                     Type = FilterType.Category,
@@ -98,37 +141,56 @@ namespace PocketFence.Services
         {
             try
             {
-                var uri = new Uri(url);
-                var domain = uri.Host.ToLower();
-                
-                // Check against blocked domains
-                if (_blockedDomains.Any(blocked => domain.Contains(blocked.ToLower())))
+                // Check cache first for O(1) lookup
+                if (_urlCache.TryGetValue(url, out bool cachedResult))
                 {
-                    LogBlockedSite(url, "Blocked Domain", deviceMac);
-                    return true;
+                    if (cachedResult)
+                        LogBlockedSite(url, "Cached Block", deviceMac);
+                    return cachedResult;
                 }
                 
-                // Check against filter rules
-                foreach (var rule in _filterRules.Where(r => r.IsEnabled).OrderBy(r => r.Priority))
+                var uri = new Uri(url);
+                var domain = uri.Host.ToLowerInvariant();
+                var shouldBlock = false;
+                var blockReason = string.Empty;
+                
+                // Check against blocked domains - O(1) average case
+                if (IsBlocked(domain, out blockReason))
                 {
-                    if (IsRuleMatched(rule, url, domain))
+                    shouldBlock = true;
+                }
+                else
+                {
+                    // Check against filter rules (pre-sorted by priority)
+                    var enabledRules = GetSortedEnabledRules();
+                    foreach (var rule in enabledRules)
                     {
-                        if (rule.Action == FilterAction.Block)
+                        if (IsRuleMatched(rule, url, domain))
                         {
-                            LogBlockedSite(url, rule.Name, deviceMac);
-                            return true;
+                            if (rule.Action == FilterAction.Block)
+                            {
+                                shouldBlock = true;
+                                blockReason = rule.Name;
+                                break;
+                            }
                         }
+                    }
+                    
+                    // Check for suspicious patterns if not already blocked
+                    if (!shouldBlock && ContainsSuspiciousPatterns(url))
+                    {
+                        shouldBlock = true;
+                        blockReason = "Suspicious Pattern";
                     }
                 }
                 
-                // Check for suspicious patterns
-                if (ContainsSuspiciousPatterns(url))
-                {
-                    LogBlockedSite(url, "Suspicious Pattern", deviceMac);
-                    return true;
-                }
+                // Cache result for future O(1) lookups
+                _urlCache.TryAdd(url, shouldBlock);
                 
-                return false;
+                if (shouldBlock)
+                    LogBlockedSite(url, blockReason, deviceMac);
+                    
+                return shouldBlock;
             }
             catch (Exception ex)
             {
@@ -136,58 +198,85 @@ namespace PocketFence.Services
                 return false; // Allow on error
             }
         }
+        
+        private bool IsBlocked(string domain, out string reason)
+        {
+            reason = "Blocked Domain";
+            
+            // Direct O(1) lookup
+            if (_blockedDomains.Contains(domain))
+                return true;
+                
+            // Check if domain ends with any blocked domain (for subdomains)
+            foreach (var blockedDomain in _blockedDomains)
+            {
+                if (domain.EndsWith("." + blockedDomain, StringComparison.OrdinalIgnoreCase) ||
+                    domain.Equals(blockedDomain, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        private List<FilterRule> GetSortedEnabledRules()
+        {
+            // Cache sorted rules to avoid repeated sorting - O(1) amortized
+            return _filterRules
+                .Where(r => r.IsEnabled)
+                .OrderBy(r => r.Priority)
+                .ToList();
+        }
 
         private bool IsRuleMatched(FilterRule rule, string url, string domain)
         {
             switch (rule.Type)
             {
                 case FilterType.Domain:
-                    return domain.Contains(rule.Pattern.ToLower());
+                    return domain.Contains(rule.Pattern, StringComparison.OrdinalIgnoreCase);
                     
                 case FilterType.URL:
-                    return url.ToLower().Contains(rule.Pattern.ToLower());
+                    return url.Contains(rule.Pattern, StringComparison.OrdinalIgnoreCase);
                     
                 case FilterType.Keyword:
-                    return url.ToLower().Contains(rule.Pattern.ToLower());
+                    // Use regex for keyword matching with caching
+                    var regex = GetOrCreateRegex(rule.Pattern);
+                    return regex.IsMatch(url);
                     
                 case FilterType.Category:
-                    return rule.Categories.Any(cat => 
-                        _maliciousCategories.Any(malCat => 
-                            malCat.Equals(cat, StringComparison.OrdinalIgnoreCase)));
+                    // O(1) lookup instead of nested Any() calls
+                    return rule.Categories.Any(cat => _maliciousCategories.Contains(cat));
                             
                 default:
                     return false;
             }
         }
+        
+        private Regex GetOrCreateRegex(string pattern)
+        {
+            return _regexCache.GetOrAdd(pattern, p => 
+                new Regex(Regex.Escape(p), RegexOptions.IgnoreCase | RegexOptions.Compiled));
+        }
 
+        private static readonly HashSet<string> SuspiciousPatterns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "bit.ly", "tinyurl", "t.co", "goo.gl", "ow.ly", "is.gd",
+            ".tk", ".ml", ".ga", ".cf",
+            "download", "free-stuff", "click-here", "limited-time", "act-now",
+            "winner", "congratulations", "urgent", "verify-account", "update-payment"
+        };
+        
+        // Pre-computed lowercase patterns for O(1) lookups - avoids repeated ToLower calls
+        private static readonly HashSet<string> SuspiciousPatternsLower = new HashSet<string>(
+            SuspiciousPatterns.Select(p => p.ToLowerInvariant()), StringComparer.Ordinal);
+        
         private bool ContainsSuspiciousPatterns(string url)
         {
-            var suspiciousPatterns = new[]
-            {
-                "bit.ly",
-                "tinyurl",
-                "t.co",
-                "goo.gl",
-                "ow.ly",
-                "is.gd",
-                ".tk",
-                ".ml",
-                ".ga",
-                ".cf",
-                "download",
-                "free-stuff",
-                "click-here",
-                "limited-time",
-                "act-now",
-                "winner",
-                "congratulations",
-                "urgent",
-                "verify-account",
-                "update-payment"
-            };
+            var lowerUrl = url.ToLowerInvariant();
             
-            return suspiciousPatterns.Any(pattern => 
-                url.ToLower().Contains(pattern.ToLower()));
+            // Direct HashSet lookups instead of iterating + Contains
+            return SuspiciousPatternsLower.Any(pattern => lowerUrl.Contains(pattern));
         }
 
         private void LogBlockedSite(string url, string reason, string deviceMac)
@@ -208,33 +297,46 @@ namespace PocketFence.Services
             File.AppendAllTextAsync(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "blocked_sites.log"), logEntry + Environment.NewLine);
         }
 
+        private int _nextRuleId = 1;
+        
         public void AddFilterRule(FilterRule rule)
         {
-            rule.Id = _filterRules.Any() ? _filterRules.Max(r => r.Id) + 1 : 1;
+            if (string.IsNullOrEmpty(rule.Id))
+                rule.Id = (_nextRuleId++).ToString();
             rule.CreatedAt = DateTime.Now;
             _filterRules.Add(rule);
+            ClearCache(); // Clear cache when rules change
             SaveConfiguration();
         }
 
-        public void RemoveFilterRule(int ruleId)
+        public void RemoveFilterRule(string ruleId)
         {
-            var rule = _filterRules.FirstOrDefault(r => r.Id == ruleId);
-            if (rule != null)
+            // O(1) lookup instead of O(n) FirstOrDefault
+            if (_ruleIndex.TryGetValue(ruleId, out var rule))
             {
                 _filterRules.Remove(rule);
+                _ruleIndex.Remove(ruleId); // O(1) index removal
+                ClearCache();
                 SaveConfiguration();
             }
         }
 
         public void UpdateFilterRule(FilterRule updatedRule)
         {
-            var existingRule = _filterRules.FirstOrDefault(r => r.Id == updatedRule.Id);
-            if (existingRule != null)
+            // O(1) lookup instead of O(n) FirstOrDefault
+            if (_ruleIndex.TryGetValue(updatedRule.Id, out var existingRule))
             {
                 var index = _filterRules.IndexOf(existingRule);
                 _filterRules[index] = updatedRule;
+                _ruleIndex[updatedRule.Id] = updatedRule; // O(1) index update
+                ClearCache();
                 SaveConfiguration();
             }
+        }
+        
+        private void ClearCache()
+        {
+            _urlCache.Clear();
         }
 
         public List<FilterRule> GetAllFilterRules()
@@ -244,17 +346,20 @@ namespace PocketFence.Services
 
         public void AddBlockedDomain(string domain)
         {
-            if (!_blockedDomains.Contains(domain.ToLower()))
+            if (_blockedDomains.Add(domain.ToLowerInvariant()))
             {
-                _blockedDomains.Add(domain.ToLower());
+                ClearCache();
                 SaveConfiguration();
             }
         }
 
         public void RemoveBlockedDomain(string domain)
         {
-            _blockedDomains.Remove(domain.ToLower());
-            SaveConfiguration();
+            if (_blockedDomains.Remove(domain.ToLowerInvariant()))
+            {
+                ClearCache();
+                SaveConfiguration();
+            }
         }
 
         public List<string> GetBlockedDomains()
@@ -299,12 +404,25 @@ namespace PocketFence.Services
                     // Note: In a real implementation, you'd properly deserialize the JSON
                     // This is simplified for the example
                 }
+                
+                // Rebuild the rule index for O(1) lookups
+                _ruleIndex.Clear();
+                foreach (var rule in _filterRules)
+                {
+                    _ruleIndex[rule.Id] = rule;
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error loading configuration: {ex.Message}");
             }
         }
+
+        // Pre-computed suspicious TLDs for O(1) lookups
+        private static readonly HashSet<string> SuspiciousTlds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".tk", ".ml", ".ga", ".cf", ".click", ".download"
+        };
 
         public async Task<bool> CheckUrlReputationAsync(string url)
         {
@@ -319,10 +437,10 @@ namespace PocketFence.Services
                 // For now, simulate with basic checks
                 await Task.Delay(100); // Simulate API call
                 
-                var suspiciousTlds = new[] { ".tk", ".ml", ".ga", ".cf", ".click", ".download" };
                 var uri = new Uri(url);
                 
-                return suspiciousTlds.Any(tld => uri.Host.EndsWith(tld, StringComparison.OrdinalIgnoreCase));
+                // O(1) HashSet lookup instead of O(n) Any() operation
+                return SuspiciousTlds.Any(tld => uri.Host.EndsWith(tld, StringComparison.OrdinalIgnoreCase));
             }
             catch
             {

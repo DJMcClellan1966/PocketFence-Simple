@@ -1,15 +1,17 @@
-namespace PocketFence.Models
+namespace PocketFence_Simple.Models
 {
     public class FilterRule
     {
-        public int Id { get; set; }
+        public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public FilterType Type { get; set; }
         public string Pattern { get; set; } = string.Empty;
         public FilterAction Action { get; set; }
         public bool IsEnabled { get; set; } = true;
-        public DateTime CreatedAt { get; set; }
+        public DateTime CreatedDate { get; set; } = DateTime.Now;
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public string RuleType { get; set; } = "Domain";
         public List<string> Categories { get; set; } = new List<string>();
         public int Priority { get; set; }
     }

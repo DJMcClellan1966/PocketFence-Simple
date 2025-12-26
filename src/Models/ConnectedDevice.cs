@@ -1,4 +1,4 @@
-namespace PocketFence.Models
+namespace PocketFence_Simple.Models
 {
     public class ConnectedDevice
     {
@@ -10,6 +10,9 @@ namespace PocketFence.Models
         public DateTime LastSeen { get; set; }
         public bool IsBlocked { get; set; }
         public bool IsChildDevice { get; set; }
+        public bool IsFiltered { get; set; }
+        public string FilterStatus => IsFiltered ? "Protected" : "Unprotected";
+        public Color FilterStatusColor => IsFiltered ? Colors.Green : Colors.Orange;
         public long DataUsage { get; set; }
         public List<string> BlockedSites { get; set; } = new List<string>();
         public DeviceCategory Category { get; set; }

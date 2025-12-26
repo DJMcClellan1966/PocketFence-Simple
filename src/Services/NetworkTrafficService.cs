@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 
-namespace PocketFence.Services
+namespace PocketFence_Simple.Services
 {
     public class NetworkTrafficService
     {
@@ -218,16 +218,19 @@ namespace PocketFence.Services
                     var output = await process.StandardOutput.ReadToEndAsync();
                     await process.WaitForExitAsync();
                     
-                    // Parse ARP output to extract MAC address
-                    var lines = output.Split('\n');
+                    // More efficient parsing with ReadOnlySpan and StringSplitOptions
+                    var lines = output.AsSpan().Trim().ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    
                     foreach (var line in lines)
                     {
-                        if (line.Contains(ipAddress) && line.Contains("-"))
+                        var trimmedLine = line.Trim();
+                        if (trimmedLine.Contains(ipAddress, StringComparison.OrdinalIgnoreCase) && 
+                            trimmedLine.Contains("-", StringComparison.Ordinal))
                         {
-                            var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                            var parts = trimmedLine.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                             if (parts.Length >= 2)
                             {
-                                return parts[1].Trim();
+                                return parts[1];
                             }
                         }
                     }

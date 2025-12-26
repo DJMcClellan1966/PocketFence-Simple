@@ -4,28 +4,63 @@ A C# Windows desktop application that enables parents to use their device's hots
 
 ## 🚀 Features
 
-- **Hotspot Management**: Create and manage Windows mobile hotspot
-- **Device Discovery**: Automatically detect devices connecting to your hotspot
-- **Content Filtering**: Block malicious websites and inappropriate content
-- **Real-time Monitoring**: Monitor network traffic and blocked attempts
-- **Parental Controls**: Manage child devices and apply content restrictions
-- **Custom Filter Rules**: Create custom blocking rules by domain, URL, or category
-- **Traffic Analytics**: View statistics on blocked content and device usage
+### 🎯 Core Functionality
+- **Hotspot Management**: Create and manage Windows mobile hotspot with custom SSID and password
+- **Device Discovery**: Automatically detect and list devices connecting to your hotspot
+- **Content Filtering**: Block malicious websites and inappropriate content in real-time
+- **Real-time Monitoring**: Monitor network traffic and view blocked attempts as they happen
+- **Parental Controls**: Manage child devices and apply specific content restrictions
+
+### 📊 Graphical Dashboard
+- **Modern Windows Forms UI**: Clean, intuitive graphical interface
+- **Multi-Tab Interface**: Organized sections for different features
+- **Real-Time Updates**: Live statistics and device status updates
+- **Device Management**: Visual device list with block/unblock controls
+- **Traffic Monitoring**: Real-time log viewer with filtering capabilities
+
+### 🛡️ Content Protection
+- **Custom Filter Rules**: Create blocking rules by domain, URL, keyword, or category
+- **Blocked Domains List**: Maintain a custom list of blocked websites
+- **Category Filtering**: Block entire categories of content
+- **Statistics Dashboard**: View comprehensive analytics on blocked content and device usage
+
+## 🖥️ Dashboard Features
+
+### Main Dashboard Tab
+- **Hotspot Status**: Real-time status indicator and toggle controls
+- **Connected Devices**: Live list of all connected devices with management options
+- **Statistics Panel**: Quick overview of device counts, blocked sites, and filter rules
+- **Device Actions**: Right-click context menu and buttons for device management
+
+### Hotspot Setup Tab
+- **Network Configuration**: Set custom SSID and password
+- **Auto-Start Option**: Configure hotspot to start automatically
+- **One-Click Apply**: Easy configuration management
+
+### Content Filter Tab
+- **Filter Rules Manager**: Add, remove, and enable/disable custom filtering rules
+- **Blocked Domains**: Manage your custom blocked websites list
+- **Rule Categories**: Organize rules by type (Domain, URL, Keyword, etc.)
+
+### Traffic Monitor Tab
+- **Real-Time Logging**: Live view of network traffic and blocked attempts
+- **Traffic Analysis**: Monitor what devices are accessing
+- **Log Management**: Clear logs and export traffic data
 
 ## 🛠️ System Requirements
 
 - Windows 10 version 1607 (build 14393) or later
 - Administrator privileges (required for network operations)
 - WiFi adapter that supports hosted networks
-- .NET 8.0 or later
+- .NET 8.0 Windows Framework
 
 ## 📋 Installation & Setup
 
 ### Prerequisites
 
-1. **Run as Administrator**: This application requires administrator privileges to manage network settings
+1. **Administrator Rights**: This application requires administrator privileges to manage network settings
 2. **WiFi Adapter**: Ensure your WiFi adapter supports Windows hosted networks
-3. **Firewall**: You may need to allow the application through Windows Firewall
+3. **Windows Firewall**: You may need to allow the application through Windows Firewall
 
 ### Getting Started
 
@@ -46,7 +81,7 @@ A C# Windows desktop application that enables parents to use their device's hots
    ```
    
    Or run the executable as Administrator:
-   ```bash
+   ```powershell
    # Right-click on the .exe and select "Run as administrator"
    ```
 
