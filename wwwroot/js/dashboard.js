@@ -284,7 +284,65 @@ function toggleFilter() {
 }
 
 function showDevices() {
-    window.open('/devices.html', '_blank');
+    // Create modal for connected devices
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📱 Connected Devices</h2>
+                <button class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="devices-container">
+                    ${generateDevicesList()}
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function generateDevicesList() {
+    const mockDevices = [
+        { name: "Sarah's iPhone", type: "Mobile", ip: "192.168.254.145", status: "Active", dataUsage: "2.1 GB", lastSeen: "2 minutes ago" },
+        { name: "Alex's Laptop", type: "Computer", ip: "192.168.254.156", status: "Active", dataUsage: "5.7 GB", lastSeen: "5 minutes ago" },
+        { name: "Mom's iPad", type: "Tablet", ip: "192.168.254.178", status: "Idle", dataUsage: "890 MB", lastSeen: "1 hour ago" }
+    ];
+
+    return mockDevices.map(device => `
+        <div class="device-card">
+            <div class="device-header">
+                <span class="device-icon">${device.type === 'Mobile' ? '📱' : device.type === 'Tablet' ? '📱' : '💻'}</span>
+                <div class="device-info">
+                    <h3>${device.name}</h3>
+                    <p class="device-type">${device.type} • ${device.ip}</p>
+                </div>
+                <div class="device-status ${device.status.toLowerCase()}">${device.status}</div>
+            </div>
+            <div class="device-stats">
+                <div class="stat">
+                    <span class="stat-label">Data Usage:</span>
+                    <span class="stat-value">${device.dataUsage}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Last Seen:</span>
+                    <span class="stat-value">${device.lastSeen}</span>
+                </div>
+            </div>
+            <div class="device-actions">
+                <button class="btn small secondary" onclick="alert('🔧 Device management: Block/Allow internet access, Set time limits, Configure restrictions')">Manage</button>
+                <button class="btn small ${device.status === 'Active' ? 'danger' : 'success'}" onclick="toggleDeviceAccess('${device.name}')">
+                    ${device.status === 'Active' ? 'Block' : 'Allow'}
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleDeviceAccess(deviceName) {
+    alert(`🔄 Access ${deviceName.includes('Block') ? 'blocked' : 'restored'} for ${deviceName}. This feature will integrate with network controls in production.`);
 }
 
 function configureFilters() {
