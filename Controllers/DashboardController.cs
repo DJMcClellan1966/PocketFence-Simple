@@ -11,29 +11,23 @@ public class DashboardController : ControllerBase
     private readonly ContentFilterService _filterService;
     private readonly HotspotService _hotspotService;
     private readonly NetworkTrafficService _networkService;
-    private readonly SmartBehaviorAnalysisService _behaviorService;
-    private readonly SmartGeofenceService _geofenceService;
-    private readonly DigitalWellnessService _wellnessService;
-    private readonly QuantumContentAnalysisService _quantumService;
+    private readonly UnifiedAIService _aiService;
+    private readonly SimpleGeofenceService _geofenceService;
     private readonly ILogger<DashboardController> _logger;
 
     public DashboardController(
         ContentFilterService filterService,
         HotspotService hotspotService,
         NetworkTrafficService networkService,
-        SmartBehaviorAnalysisService behaviorService,
-        SmartGeofenceService geofenceService,
-        DigitalWellnessService wellnessService,
-        QuantumContentAnalysisService quantumService,
+        UnifiedAIService aiService,
+        SimpleGeofenceService geofenceService,
         ILogger<DashboardController> logger)
     {
         _filterService = filterService;
         _hotspotService = hotspotService;
         _networkService = networkService;
-        _behaviorService = behaviorService;
+        _aiService = aiService;
         _geofenceService = geofenceService;
-        _wellnessService = wellnessService;
-        _quantumService = quantumService;
         _logger = logger;
     }
 
@@ -102,84 +96,43 @@ public class DashboardController : ControllerBase
         }
     }
 
-    [HttpGet("wellness/{deviceId}")]
-    public async Task<IActionResult> GetWellnessInsights(string deviceId)
+    [HttpGet("insights/{deviceId}")]
+    public async Task<IActionResult> GetDeviceInsights(string deviceId)
     {
         try
         {
-            var report = await _wellnessService.GenerateWellnessReportAsync(deviceId, TimeSpan.FromDays(7));
-            return Ok(report);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get wellness insights for device {DeviceId}", deviceId);
-            return StatusCode(500, new { error = "Failed to retrieve wellness data" });
-        }
-    }
-
-    [HttpGet("behavior/{deviceId}")]
-    public async Task<IActionResult> GetBehaviorInsights(string deviceId)
-    {
-        try
-        {
-            var insights = await _behaviorService.GetBehaviorInsightsAsync(deviceId);
+            var insights = await _aiService.GetDeviceInsightsAsync(deviceId);
             return Ok(insights);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get behavior insights for device {DeviceId}", deviceId);
-            return StatusCode(500, new { error = "Failed to retrieve behavior data" });
+            _logger.LogError(ex, "Failed to get insights for device {DeviceId}", deviceId);
+            return StatusCode(500, new { error = "Failed to retrieve insights" });
         }
     }
 
-    [HttpPost("geofence")]
-    public async Task<IActionResult> AddGeofence([FromBody] GeofenceRequest request)
+    [HttpPost("location/{deviceId}")]
+    public async Task<IActionResult> UpdateLocation(string deviceId, [FromBody] LocationUpdateRequest request)
     {
         try
         {
-            var zone = new Services.GeofenceZone
-            {
-                Name = request.Zone.Name,
-                Type = (Services.ZoneType)request.Zone.Type,
-                RestrictiveLevel = (Services.RestrictionLevel)request.Zone.RestrictiveLevel,
-                AllowedCategories = request.Zone.AllowedCategories
-            };
-            
-            var zoneId = await _geofenceService.AddCustomGeofenceAsync(
-                request.Latitude, 
-                request.Longitude, 
-                request.Radius, 
-                zone
-            );
-            return Ok(new { zoneId, message = "Geofence created successfully" });
+            var success = await _geofenceService.UpdateDeviceLocationAsync(deviceId, request.Latitude, request.Longitude);
+            var status = await _geofenceService.GetDeviceGeofenceStatusAsync(deviceId);
+            return Ok(new { success, status, message = "Location updated successfully" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create geofence");
-            return StatusCode(500, new { error = "Failed to create geofence" });
+            _logger.LogError(ex, "Failed to update location for device {DeviceId}", deviceId);
+            return StatusCode(500, new { error = "Failed to update location" });
         }
     }
 
     [HttpPost("analyze-content")]
-    public async Task<IActionResult> AnalyzeContent([FromBody] Models.ContentAnalysisRequest request)
+    public async Task<IActionResult> AnalyzeContent([FromBody] ContentAnalysisRequest request)
     {
         try
         {
-            var context = new Services.ContentContext
-            {
-                Source = request.Context.Source,
-                Platform = request.Context.Platform,
-                TimeOfDay = request.Context.TimeOfDay,
-                DayOfWeek = request.Context.DayOfWeek,
-                UserAge = request.Context.UserAge,
-                RecentActivity = request.Context.RecentActivity
-            };
-            
-            var result = await _quantumService.AnalyzeContentAsync(
-                request.Content, 
-                request.DeviceId, 
-                context
-            );
+            var result = await _aiService.AnalyzeContentAsync(request.Content, request.Url);
             return Ok(result);
         }
         catch (Exception ex)

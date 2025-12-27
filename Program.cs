@@ -100,18 +100,15 @@ static void ConfigureServices(IServiceCollection services)
     services.AddSingleton<ContentFilterService>();    
     // Register network mode detection service
     services.AddSingleton<INetworkModeService, NetworkModeService>();
-    // Register AI services - using modern DI patterns
+    // Register simplified AI services (replaces multiple complex services)
+    services.AddSingleton<UnifiedAIService>();
+    services.AddSingleton<SimpleGeofenceService>();
+    services.AddHostedService<UnifiedAIService>();
+    
+    // Keep essential support services
     services.AddSingleton<AINotificationService>();
-    services.AddSingleton<AIThreatDetectionService>();
     services.AddSingleton<SelfHealingService>();
     services.AddSingleton<AutoUpdateService>();
-    services.AddSingleton<AIParentalAssistantService>();
-    
-    // Register innovative advanced services
-    services.AddSingleton<SmartBehaviorAnalysisService>();
-    services.AddSingleton<SmartGeofenceService>();
-    services.AddSingleton<DigitalWellnessService>();
-    services.AddSingleton<QuantumContentAnalysisService>();
     
     // Register iOS services
     services.AddSingleton<iOSHotspotHelper>();

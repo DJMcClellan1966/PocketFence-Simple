@@ -97,8 +97,8 @@ class PocketFenceDashboard {
                 networkMode: networkMode  // Store network mode data
             };
 
-            // Load advanced insights for connected devices
-            await this.loadAdvancedInsights();
+            // Load unified insights for connected devices
+            await this.loadUnifiedInsights();
 
             this.updateUI();
         } catch (error) {
@@ -108,31 +108,33 @@ class PocketFenceDashboard {
         }
     }
 
-    async loadAdvancedInsights() {
+    async loadUnifiedInsights() {
         try {
             // For demo purposes, using mock device IDs
             const deviceIds = ['device-1', 'device-2', 'device-3'];
             
             for (const deviceId of deviceIds) {
                 try {
-                    const [wellnessResponse, behaviorResponse] = await Promise.all([
-                        fetch(`/api/dashboard/wellness/${deviceId}`),
-                        fetch(`/api/dashboard/behavior/${deviceId}`)
-                    ]);
+                    const insightsResponse = await fetch(`/api/dashboard/insights/${deviceId}`);
 
-                    if (wellnessResponse.ok) {
-                        this.data.wellnessInsights[deviceId] = await wellnessResponse.json();
-                    }
-                    
-                    if (behaviorResponse.ok) {
-                        this.data.behaviorAnalysis[deviceId] = await behaviorResponse.json();
+                    if (insightsResponse.ok) {
+                        const insights = await insightsResponse.json();
+                        // Store unified insights combining behavior and wellness data
+                        this.data.deviceInsights = this.data.deviceInsights || {};
+                        this.data.deviceInsights[deviceId] = {
+                            behaviorScore: insights.behaviorScore,
+                            wellnessScore: insights.wellnessScore,
+                            riskLevel: insights.riskLevel,
+                            recommendations: insights.recommendations,
+                            lastUpdated: insights.lastUpdated
+                        };
                     }
                 } catch (deviceError) {
                     console.warn(`⚠️ Failed to load insights for device ${deviceId}:`, deviceError);
                 }
             }
         } catch (error) {
-            console.warn('⚠️ Failed to load advanced insights:', error);
+            console.warn('⚠️ Failed to load unified insights:', error);
         }
     }
 
