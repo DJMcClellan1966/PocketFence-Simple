@@ -11,17 +11,29 @@ public class DashboardController : ControllerBase
     private readonly ContentFilterService _filterService;
     private readonly HotspotService _hotspotService;
     private readonly NetworkTrafficService _networkService;
+    private readonly SmartBehaviorAnalysisService _behaviorService;
+    private readonly SmartGeofenceService _geofenceService;
+    private readonly DigitalWellnessService _wellnessService;
+    private readonly QuantumContentAnalysisService _quantumService;
     private readonly ILogger<DashboardController> _logger;
 
     public DashboardController(
         ContentFilterService filterService,
         HotspotService hotspotService,
         NetworkTrafficService networkService,
+        SmartBehaviorAnalysisService behaviorService,
+        SmartGeofenceService geofenceService,
+        DigitalWellnessService wellnessService,
+        QuantumContentAnalysisService quantumService,
         ILogger<DashboardController> logger)
     {
         _filterService = filterService;
         _hotspotService = hotspotService;
         _networkService = networkService;
+        _behaviorService = behaviorService;
+        _geofenceService = geofenceService;
+        _wellnessService = wellnessService;
+        _quantumService = quantumService;
         _logger = logger;
     }
 
@@ -87,6 +99,93 @@ public class DashboardController : ControllerBase
         {
             _logger.LogError(ex, "Failed to get recent activity");
             return StatusCode(500, new { error = "Failed to retrieve activity" });
+        }
+    }
+
+    [HttpGet("wellness/{deviceId}")]
+    public async Task<IActionResult> GetWellnessInsights(string deviceId)
+    {
+        try
+        {
+            var report = await _wellnessService.GenerateWellnessReportAsync(deviceId, TimeSpan.FromDays(7));
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get wellness insights for device {DeviceId}", deviceId);
+            return StatusCode(500, new { error = "Failed to retrieve wellness data" });
+        }
+    }
+
+    [HttpGet("behavior/{deviceId}")]
+    public async Task<IActionResult> GetBehaviorInsights(string deviceId)
+    {
+        try
+        {
+            var insights = await _behaviorService.GetBehaviorInsightsAsync(deviceId);
+            return Ok(insights);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get behavior insights for device {DeviceId}", deviceId);
+            return StatusCode(500, new { error = "Failed to retrieve behavior data" });
+        }
+    }
+
+    [HttpPost("geofence")]
+    public async Task<IActionResult> AddGeofence([FromBody] GeofenceRequest request)
+    {
+        try
+        {
+            var zone = new Services.GeofenceZone
+            {
+                Name = request.Zone.Name,
+                Type = (Services.ZoneType)request.Zone.Type,
+                RestrictiveLevel = (Services.RestrictionLevel)request.Zone.RestrictiveLevel,
+                AllowedCategories = request.Zone.AllowedCategories
+            };
+            
+            var zoneId = await _geofenceService.AddCustomGeofenceAsync(
+                request.Latitude, 
+                request.Longitude, 
+                request.Radius, 
+                zone
+            );
+            return Ok(new { zoneId, message = "Geofence created successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create geofence");
+            return StatusCode(500, new { error = "Failed to create geofence" });
+        }
+    }
+
+    [HttpPost("analyze-content")]
+    public async Task<IActionResult> AnalyzeContent([FromBody] Models.ContentAnalysisRequest request)
+    {
+        try
+        {
+            var context = new Services.ContentContext
+            {
+                Source = request.Context.Source,
+                Platform = request.Context.Platform,
+                TimeOfDay = request.Context.TimeOfDay,
+                DayOfWeek = request.Context.DayOfWeek,
+                UserAge = request.Context.UserAge,
+                RecentActivity = request.Context.RecentActivity
+            };
+            
+            var result = await _quantumService.AnalyzeContentAsync(
+                request.Content, 
+                request.DeviceId, 
+                context
+            );
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to analyze content");
+            return StatusCode(500, new { error = "Failed to analyze content" });
         }
     }
 

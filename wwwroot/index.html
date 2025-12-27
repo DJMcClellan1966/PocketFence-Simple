@@ -842,6 +842,26 @@
                 <div class="notification-badge" id="insights-badge">!</div>
             </div>
 
+            <div class="card success">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">💚</span>
+                    <span class="card-title">Digital Wellness</span>
+                </div>
+                <div class="metric-value" id="wellness-score">82</div>
+                <div class="metric-label">wellness score</div>
+                <button class="btn success" onclick="showWellnessReport()">View Report</button>
+            </div>
+
+            <div class="card primary">
+                <div class="card-header">
+                    <span style="font-size: 1.5rem;">📊</span>
+                    <span class="card-title">Behavior Analysis</span>
+                </div>
+                <div class="metric-value" id="behavior-score">Good</div>
+                <div class="metric-label">behavior pattern</div>
+                <button class="btn primary" onclick="showBehaviorAnalysis()">View Details</button>
+            </div>
+
             <div class="card warning">
                 <div class="card-header">
                     <span style="font-size: 1.5rem;">🚨</span>
@@ -1237,6 +1257,14 @@
         function showAIActions() {
             document.getElementById('ai-actions-modal').style.display = 'block';
             loadAIActions();
+        }
+
+        function showWellnessReport() {
+            alert('🏥 Digital Wellness Report\\n\\n📊 Overall Score: 82/100\\n👁️ Eye Care: Good (regular breaks taken)\\n🧘 Posture Health: Needs improvement\\n💤 Sleep Impact: Minimal\\n🏃 Activity Balance: 6:1 screen-to-movement ratio\\n\\nRecommendations:\\n• Take more movement breaks\\n• Consider blue light filter after 8 PM\\n• Increase text size for better readability');
+        }
+
+        function showBehaviorAnalysis() {
+            alert('🧠 Behavioral Analysis\\n\\n📈 Usage Pattern: Stable and predictable\\n🎯 Attention Span: 15-20 minutes (age appropriate)\\n📚 Educational Content: 35% of screen time\\n🎮 Entertainment: 45% of screen time\\n📱 Social: 20% of screen time\\n\\nInsights:\\n• Consistent bedtime routine\\n• Good balance of activities\\n• Minor increase in weekend usage\\n• Recommended: 10 more minutes of educational content daily');
         }
 
         function closeAIActions() {

@@ -107,6 +107,12 @@ static void ConfigureServices(IServiceCollection services)
     services.AddSingleton<AutoUpdateService>();
     services.AddSingleton<AIParentalAssistantService>();
     
+    // Register innovative advanced services
+    services.AddSingleton<SmartBehaviorAnalysisService>();
+    services.AddSingleton<SmartGeofenceService>();
+    services.AddSingleton<DigitalWellnessService>();
+    services.AddSingleton<QuantumContentAnalysisService>();
+    
     // Register iOS services
     services.AddSingleton<iOSHotspotHelper>();
 

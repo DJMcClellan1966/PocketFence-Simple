@@ -11,6 +11,10 @@ class PocketFenceDashboard {
             warningCount: 0,
             filterEnabled: true,
             recentActivity: [],
+            wellnessInsights: {},
+            behaviorAnalysis: {},
+            geofenceZones: [],
+            contentAnalysisHistory: [],
             networkMode: {
                 mode: 'Unknown',
                 networkName: '',
@@ -93,11 +97,42 @@ class PocketFenceDashboard {
                 networkMode: networkMode  // Store network mode data
             };
 
+            // Load advanced insights for connected devices
+            await this.loadAdvancedInsights();
+
             this.updateUI();
         } catch (error) {
             console.error('❌ Failed to load dashboard data:', error);
             // Use mock data for demonstration
             this.loadMockData();
+        }
+    }
+
+    async loadAdvancedInsights() {
+        try {
+            // For demo purposes, using mock device IDs
+            const deviceIds = ['device-1', 'device-2', 'device-3'];
+            
+            for (const deviceId of deviceIds) {
+                try {
+                    const [wellnessResponse, behaviorResponse] = await Promise.all([
+                        fetch(`/api/dashboard/wellness/${deviceId}`),
+                        fetch(`/api/dashboard/behavior/${deviceId}`)
+                    ]);
+
+                    if (wellnessResponse.ok) {
+                        this.data.wellnessInsights[deviceId] = await wellnessResponse.json();
+                    }
+                    
+                    if (behaviorResponse.ok) {
+                        this.data.behaviorAnalysis[deviceId] = await behaviorResponse.json();
+                    }
+                } catch (deviceError) {
+                    console.warn(`⚠️ Failed to load insights for device ${deviceId}:`, deviceError);
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to load advanced insights:', error);
         }
     }
 
