@@ -1,0 +1,17 @@
+{
+  "Firebase": {
+    "ProjectId": "pocketfence-27778",
+    "DatabaseUrl": "https://pocketfence-27778-default-rtdb.firebaseio.com/",
+    "ServiceAccountKeyPath": "firebase-service-account-key.json",
+    "ApiKey": "AIzaSyBX-your-api-key-here",
+    "AuthDomain": "pocketfence-27778.firebaseapp.com",
+    "StorageBucket": "pocketfence-27778.appspot.com",
+    "MessagingSenderId": "123456789012"
+  },
+  "Authentication": {
+    "JwtSecret": "your-jwt-secret-key-here-should-be-at-least-32-characters-long",
+    "JwtIssuer": "PocketFence",
+    "JwtAudience": "PocketFence-Users",
+    "JwtExpirationMinutes": 1440
+  }
+}
